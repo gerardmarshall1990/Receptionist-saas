@@ -1,0 +1,27 @@
+{
+  "slug": "hvac",
+  "label": "HVAC",
+  "defaultVoiceId": "voice-calm-2",
+  "painPoints": [
+    "Heat waves and cold snaps flood the phones, and every missed call is a lost install or repair.",
+    "Techs are on roofs and in attics, not near a phone.",
+    "Customers call two or three companies and book the first one that answers."
+  ],
+  "qualificationQuestions": [
+    "Do you offer same-day service in peak season?",
+    "Who picks up when every tech is out on a job?"
+  ],
+  "commonFaqs": [
+    { "question": "Do you service my brand of system?", "answer": "Ask the owner which brands they service; do not guess." }
+  ],
+  "defaultServices": [
+    { "name": "AC repair" },
+    { "name": "Furnace repair" },
+    { "name": "System installation" }
+  ],
+  "defaultCallFlow": ["greet", "qualify_job", "capture_contact", "book_or_take_message", "confirm"],
+  "objections": [
+    { "objection": "We're too busy to set up anything new.", "response": "That's the reason it helps. Setup is a couple of minutes and it's already running on this call." }
+  ],
+  "closeFraming": "Try it free for 7 days, before the next heat wave hits."
+}

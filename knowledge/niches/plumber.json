@@ -1,0 +1,29 @@
+{
+  "slug": "plumber",
+  "label": "Plumbers",
+  "defaultVoiceId": "voice-warm-1",
+  "painPoints": [
+    "A burst pipe or backed-up drain is an emergency, and the caller rings the next plumber if nobody picks up.",
+    "You're under a sink with both hands full when the phone rings, so jobs go to whoever answers first.",
+    "After-hours emergency calls are the highest-value jobs and the ones most often missed."
+  ],
+  "qualificationQuestions": [
+    "Do you handle emergency call-outs after hours?",
+    "Who answers the phone when you're out on a job?",
+    "Roughly how many calls a week go to voicemail?"
+  ],
+  "commonFaqs": [
+    { "question": "Do you do emergency call-outs?", "answer": "Ask the owner for their emergency policy; do not guess." },
+    { "question": "Do you give free quotes?", "answer": "Ask the owner for their quoting policy; do not guess." }
+  ],
+  "defaultServices": [
+    { "name": "Leak repair" },
+    { "name": "Drain clearing" },
+    { "name": "Water heater service" }
+  ],
+  "defaultCallFlow": ["greet", "qualify_job", "capture_contact", "book_or_take_message", "confirm"],
+  "objections": [
+    { "objection": "I already have someone who answers.", "response": "Fair enough. Does that person cover nights and weekends too, or just business hours?" }
+  ],
+  "closeFraming": "Try it free for 7 days. The next emergency call you'd have missed pays for it."
+}
