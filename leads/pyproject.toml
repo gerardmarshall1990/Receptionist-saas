@@ -5,8 +5,9 @@ description = "Frontdesk leads engine: builds a verified, scored, compliant data
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "duckdb>=2.0",
+    "fastapi>=0.165.0",
     "phonenumbers>=9.0.43",
-    "psycopg[binary]>=3.2",
+    "psycopg[binary,pool]>=3.2",
     "pyarrow>=26.0.1",
     "pydantic>=2.9",
     "pydantic-settings>=2.6",
@@ -14,6 +15,7 @@ dependencies = [
     "structlog>=24.4",
     "timezonefinder>=9.2.0",
     "tldextract>=5.4.0",
+    "uvicorn>=0.54.0",
 ]
 
 [project.scripts]
@@ -21,6 +23,8 @@ leads = "leads_engine.cli:main"
 
 [dependency-groups]
 dev = [
+    "httpx>=0.28.1",
+    "httpx2>=2.16.2",
     "mypy>=1.13",
     "pytest>=8.3",
     "ruff>=0.8",
@@ -45,9 +49,11 @@ ignore = []
 
 [tool.ruff.lint.per-file-ignores]
 # Tests hold data tables and build SQL from tmp paths they created themselves.
-"tests/**" = ["S101", "S105", "S106", "S608", "E501"]
+# ...and the browser test starts node with fixed arguments.
+"tests/**" = ["S101", "S105", "S106", "S608", "E501", "S603", "S607"]
 # Markdown report: long literal table/prose strings.
 "src/leads_engine/universe/report.py" = ["E501"]
+"src/leads_engine/explorer/bench.py" = ["E501"]
 
 [tool.mypy]
 python_version = "3.12"

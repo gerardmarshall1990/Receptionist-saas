@@ -22,8 +22,8 @@ Read first: `docs/MASTER-SPEC.md` (the spec), `docs/ICP.md` (who we target), `do
 One stage at a time (spec §9): explore -> plan -> **wait for approval** -> implement with tests -> verify -> report
 (done / tested / untested / gaps / open questions) -> **wait for "verified"**. Commit after each green stage. Ask before adding scope.
 
-Current status: **Stage 1 done, awaiting "verified"** (US universe pilot: plumbing, HVAC, dental; 20k in Postgres).
-Reports: `docs/reports/taxonomy-<release>.md`, `docs/reports/stage1-pilot-<release>.md`. Next: lead-explorer UI plan.
+Current status: **Stage 1b (lead explorer UI) done, awaiting "verified"**. Stage 1 verified.
+Reports: `docs/reports/stage1-pilot-<release>.md`, `docs/reports/explorer-benchmark.md` (3M rows). Next: Stage 2 crawl plan.
 
 ## Commands
 
@@ -58,6 +58,15 @@ uv run leads universe plan       # what would be read/written (reads only cached
 uv run leads universe pilot --dry-run
 uv run leads universe pilot      # census -> extract -> build -> load -> report (each step idempotent)
 uv run leads universe census|extract|build|load|report [--categories plumbing,hvac] [--force]
+uv run leads universe load --all # every kept business (233k for the pilot categories), not just the sample
+
+# Lead explorer (Stage 1b): http://127.0.0.1:8765/
+uv run leads ui serve            # localhost only; set LEADS_UI_TOKEN to allow --host 0.0.0.0
+uv run leads ui bench            # clones the DB to a throwaway *_bench DB at 3M rows, times the API,
+                                 # writes docs/reports/explorer-benchmark.md (--reuse to skip re-cloning)
+
+# browser test (needs node + playwright; runs inside pytest when TEST_DATABASE_URL is set)
+LEADS_E2E_SCREENSHOTS=/some/dir uv run pytest tests/test_explorer_e2e.py -s
 ```
 
 Stage 1 data flow (all under `data/`, gitignored):
@@ -84,6 +93,8 @@ src/leads_engine/log.py       structlog JSON logging; bind_run(run_id, stage) at
 src/leads_engine/db.py        Postgres connect + migration runner; DuckDB for Parquet
 src/leads_engine/cli.py       `leads` command (+ universe_commands.py)
 src/leads_engine/runs.py      every job records a `runs` row; hard budget stop
+src/leads_engine/explorer/    app.py (FastAPI API + auth/CSP), queries.py (whitelisted SQL, keyset paging),
+                              facts.py (Stage 1 facts, call windows), bench.py, static/ (no-build UI)
 src/leads_engine/universe/    overture.py (remote read), normalize.py (pure), build.py (exclude/chain/dedupe/
                               sample), load.py (Postgres upsert), report.py, pipeline.py (paths + steps)
 migrations/NNN_*.sql          applied in order, each in a transaction, tracked in schema_migrations
@@ -103,6 +114,10 @@ data/                         raw/derived bulk files (Parquet). Gitignored. Neve
 - **Chain rules:** `chain_name_patterns` match the START of the normalized name; `chain_name_contains` match anywhere.
   Don't add generic-sounding brands ("Gentle Dental"): the website-domain rule catches real chain locations and the
   name would also hit independents. Review the chain table in the Stage 1 report after any change.
+- **Explorer rules:** every filter/sort is whitelisted server-side and values are bound parameters; the UI inserts
+  data only as text. "Why this lead" shows ONLY rows from the `reasons` table (evidence + source URL); Stage 1
+  facts are shown separately and restate stored fields. No export until the Stage 5 compliance gate.
+  Re-run `leads ui bench` after changing queries or indexes; target p95 < 300 ms at 3M rows.
 - **Overture release** is pinned in `global.yaml`. Bumping it requires `leads universe census` and re-confirming codes.
 - **Tests that need fixtures** (saved HTML etc.) go in `tests/fixtures/`. Never hit the network in tests.
 

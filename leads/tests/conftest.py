@@ -64,7 +64,7 @@ def fresh_db() -> Iterator[str]:
     assert TEST_URL
     name = f"leads_t_{uuid.uuid4().hex[:10]}"
     with psycopg.connect(TEST_URL, autocommit=True) as admin:
-        admin.execute(f'create database "{name}"')
+        admin.execute(f'create database "{name}" template template0')
     base, _, _ = TEST_URL.rpartition("/")
     try:
         yield f"{base}/{name}"

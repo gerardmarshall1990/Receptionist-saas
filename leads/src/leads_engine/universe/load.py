@@ -1,15 +1,25 @@
-"""Load the pilot sample from the built Parquet into Postgres (idempotent upsert)."""
+"""Load kept businesses from the built Parquet into Postgres (idempotent, set-based).
+
+scope="sample": the stratified pilot sample only (20k).
+scope="all":    every kept business (not excluded, not a duplicate).
+
+After a load, Postgres mirrors the chosen scope for this source: rows that are no
+longer in it are deleted if no later stage has touched them (crawled_at is null),
+otherwise only un-marked. Rows are COPYed into temp tables and merged with a few
+set-based statements, so 250k rows take seconds.
+"""
 
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import duckdb
 import psycopg
-from psycopg import sql
 
 from leads_engine.universe.overture import LICENSE_NOTE
+
+Scope = Literal["sample", "all"]
 
 _BUSINESS_COLS = (
     "source", "source_id", "source_release", "name", "name_key", "category", "subcategory",
@@ -18,107 +28,136 @@ _BUSINESS_COLS = (
     "licenses", "attribution", "merged_source_ids", "in_pilot_sample",
 )  # fmt: skip
 
+_STAGE_DDL = """
+create temp table stage_b (
+  source text, source_id text, source_release text, name text, name_key text, category text,
+  subcategory text, source_category_code text, country text, state text, city text, address text,
+  postcode text, lat double precision, lng double precision, tz text, phone text, website text,
+  domain text, location_count integer, flags text[], source_confidence double precision,
+  source_datasets text[], licenses text[], attribution text, merged_source_ids text[],
+  in_pilot_sample boolean
+) on commit drop;
+create temp table stage_p (
+  source_id text, e164 text, valid boolean, number_type text, flags text[]
+) on commit drop;
+create temp table stage_e (
+  source_id text, email text, syntax_ok boolean, is_role_based boolean, is_freemail boolean,
+  domain_matches_site boolean, flags text[]
+) on commit drop;
+"""
+
+_MERGE = """
+insert into businesses ({cols})
+select {cols} from stage_b
+on conflict (source, source_id) do update set {updates}, updated_at = now();
+
+delete from phones p using businesses b, stage_b s
+  where p.business_id = b.id and b.source = s.source and b.source_id = s.source_id;
+insert into phones (business_id, e164, sources, agree_count, valid_format, number_type_guess,
+                    flags, status)
+select distinct on (b.id, sp.e164) b.id, sp.e164, array['overture'], 1, sp.valid, sp.number_type,
+       sp.flags, case when sp.valid then 'unverified' else 'invalid' end
+from stage_p sp join businesses b on b.source = 'overture' and b.source_id = sp.source_id;
+
+delete from emails e using businesses b, stage_b s
+  where e.business_id = b.id and e.origin = 'source_listed'
+    and b.source = s.source and b.source_id = s.source_id;
+insert into emails (business_id, email, origin, syntax_ok, is_role_based, is_freemail,
+                    domain_matches_site, flags)
+select distinct on (b.id, se.email) b.id, se.email, 'source_listed', se.syntax_ok,
+       se.is_role_based, se.is_freemail, se.domain_matches_site, se.flags
+from stage_e se join businesses b on b.source = 'overture' and b.source_id = se.source_id;
+
+-- Denormalized contact status for the explorer (never upgrades past what is stored).
+update businesses b set
+  phone_status = case
+    when b.phone is null then 'none'
+    else coalesce(
+      (select p.status from phones p where p.business_id = b.id and p.e164 = b.phone), 'none')
+  end,
+  email_status = case
+    when exists (select 1 from emails e where e.business_id = b.id and e.origin = 'business_site')
+      then 'site_found'
+    when exists (select 1 from emails e where e.business_id = b.id) then 'source_listed'
+    else 'none'
+  end
+from stage_b s where b.source = s.source and b.source_id = s.source_id;
+"""
+
 
 def attribution(release: str, datasets: list[str]) -> str:
     srcs = ", ".join(datasets) if datasets else "Overture"
     return f"{LICENSE_NOTE}. Release {release}. Contributing datasets: {srcs}."
 
 
-def sample_rows(built: Path) -> list[dict[str, Any]]:
-    con = duckdb.connect()
-    q = "select * from read_parquet($p) where in_sample and exclusion is null and dup_of is null"
-    rows: list[dict[str, Any]] = con.sql(q, params={"p": str(built)}).to_arrow_table().to_pylist()
+def kept_rows(built: Path, scope: Scope = "sample") -> list[dict[str, Any]]:
+    where = "exclusion is null and dup_of is null" + (" and in_sample" if scope == "sample" else "")
+    q = f"select * from read_parquet($p) where {where}"  # noqa: S608 (fixed clauses)
+    rows: list[dict[str, Any]] = (
+        duckdb.connect().sql(q, params={"p": str(built)}).to_arrow_table().to_pylist()
+    )
     return rows
 
 
-def _business_values(r: dict[str, Any]) -> dict[str, Any]:
-    vals = {c: r.get(c) for c in _BUSINESS_COLS}
-    vals["source_confidence"] = r["confidence"]
-    vals["attribution"] = attribution(r["source_release"], r["source_datasets"])
-    vals["in_pilot_sample"] = True
-    return vals
+def sample_rows(built: Path) -> list[dict[str, Any]]:
+    return kept_rows(built, "sample")
 
 
-_UPSERT = sql.SQL(
-    "insert into businesses ({cols}) values ({vals})"
-    " on conflict (source, source_id) do update set {updates}, updated_at = now()"
-    " returning id"
-).format(
-    cols=sql.SQL(", ").join(map(sql.Identifier, _BUSINESS_COLS)),
-    vals=sql.SQL(", ").join(map(sql.Placeholder, _BUSINESS_COLS)),
-    updates=sql.SQL(", ").join(
-        sql.SQL("{c} = excluded.{c}").format(c=sql.Identifier(c))
-        for c in _BUSINESS_COLS
-        if c not in {"source", "source_id"}
-    ),
-)
-_INSERT_PHONE = (
-    "insert into phones (business_id, e164, sources, agree_count, valid_format,"
-    " number_type_guess, flags, status) values (%s, %s, %s, 1, %s, %s, %s, %s)"
-    " on conflict do nothing"
-)
-_INSERT_EMAIL = (
-    "insert into emails (business_id, email, origin, syntax_ok, is_role_based,"
-    " is_freemail, domain_matches_site, flags)"
-    " values (%s, %s, 'source_listed', %s, %s, %s, %s, %s) on conflict do nothing"
-)
+def _merge_sql() -> str:
+    cols = ", ".join(_BUSINESS_COLS)
+    updates = ", ".join(
+        f"{c} = excluded.{c}" for c in _BUSINESS_COLS if c not in {"source", "source_id"}
+    )
+    return _MERGE.format(cols=cols, updates=updates)
+
+
+def load(url: str, built: Path, scope: Scope = "sample") -> dict[str, int]:
+    rows = kept_rows(built, scope)
+    if any(not r["licenses"] for r in rows):
+        raise ValueError("refusing to load rows without a source license")
+    counts = {"businesses": len(rows), "phones": 0, "emails": 0}
+    with psycopg.connect(url) as conn, conn.transaction(), conn.cursor() as cur:
+        cur.execute(_STAGE_DDL)
+        with cur.copy(f"copy stage_b ({', '.join(_BUSINESS_COLS)}) from stdin") as cp:
+            for r in rows:
+                v = {c: r.get(c) for c in _BUSINESS_COLS}
+                v["source_confidence"] = r["confidence"]
+                v["attribution"] = attribution(r["source_release"], r["source_datasets"])
+                v["in_pilot_sample"] = bool(r["in_sample"])
+                cp.write_row([v[c] for c in _BUSINESS_COLS])
+        with cur.copy("copy stage_p from stdin") as cp:
+            for r in rows:
+                for p in r["phones"]:
+                    if p["e164"]:  # unparseable/invalid numbers stay in Parquet only
+                        cp.write_row(
+                            [r["source_id"], p["e164"], p["valid"], p["number_type"], p["flags"]]
+                        )
+                        counts["phones"] += 1
+        with cur.copy("copy stage_e from stdin") as cp:
+            for r in rows:
+                for e in r["emails"]:
+                    cp.write_row(
+                        [r["source_id"], e["email"], e["syntax_ok"], e["is_role_based"],
+                         e["is_freemail"], e["domain_matches_site"], e["flags"]]
+                    )  # fmt: skip
+                    counts["emails"] += 1
+        # Mirror the scope: drop rows that left it, unless a later stage touched them.
+        cur.execute(
+            "delete from businesses b where b.source = 'overture' and b.crawled_at is null"
+            " and not exists (select 1 from stage_b s where s.source_id = b.source_id)"
+        )
+        counts["removed_not_in_scope"] = cur.rowcount
+        cur.execute(
+            "update businesses b set in_pilot_sample = false where b.source = 'overture'"
+            " and b.in_pilot_sample"
+            " and not exists (select 1 from stage_b s where s.source_id = b.source_id)"
+        )
+        counts["unmarked_not_in_scope"] = cur.rowcount
+        cur.execute(_merge_sql())
+    with psycopg.connect(url, autocommit=True) as conn:
+        conn.execute("analyze businesses; analyze phones; analyze emails")
+    return counts
 
 
 def load_sample(url: str, built: Path) -> dict[str, int]:
-    rows = sample_rows(built)
-    if any(not r["licenses"] for r in rows):
-        raise ValueError("refusing to load rows without a source license")
-    counts = {"businesses": 0, "phones": 0, "emails": 0}
-    with psycopg.connect(url) as conn, conn.transaction(), conn.cursor() as cur:
-        # Rows that left the sample (e.g. a config change now excludes them): delete
-        # them if no later stage has touched them, otherwise just un-mark them.
-        ids = [r["source_id"] for r in rows]
-        cur.execute(
-            "delete from businesses where in_pilot_sample and crawled_at is null"
-            " and not (source_id = any(%s))",
-            (ids,),
-        )
-        counts["removed_from_previous_sample"] = cur.rowcount
-        cur.execute(
-            "update businesses set in_pilot_sample = false"
-            " where in_pilot_sample and not (source_id = any(%s))",
-            (ids,),
-        )
-        counts["unmarked_from_previous_sample"] = cur.rowcount
-        for r in rows:
-            cur.execute(_UPSERT, _business_values(r))
-            row = cur.fetchone()
-            if row is None:
-                raise RuntimeError(f"upsert returned no id for {r['source_id']}")
-            bid = row[0]
-            counts["businesses"] += 1
-            # Contacts are replaced wholesale so a rerun converges to the Parquet.
-            cur.execute("delete from phones where business_id = %s", (bid,))
-            cur.execute(
-                "delete from emails where business_id = %s and origin = 'source_listed'", (bid,)
-            )
-            for p in r["phones"]:
-                if not p["e164"]:
-                    continue  # unparseable/invalid numbers stay in Parquet only
-                status = "unverified" if p["valid"] else "invalid"
-                cur.execute(
-                    _INSERT_PHONE,
-                    (
-                        bid,
-                        p["e164"],
-                        ["overture"],
-                        p["valid"],
-                        p["number_type"],
-                        p["flags"],
-                        status,
-                    ),
-                )
-                counts["phones"] += 1
-            for e in r["emails"]:
-                cur.execute(
-                    _INSERT_EMAIL,
-                    (bid, e["email"], e["syntax_ok"], e["is_role_based"], e["is_freemail"],
-                     e["domain_matches_site"], e["flags"]),
-                )  # fmt: skip
-                counts["emails"] += 1
-    return counts
+    return load(url, built, "sample")

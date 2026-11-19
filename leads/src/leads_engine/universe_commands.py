@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Literal
 
 import duckdb
 
@@ -15,7 +15,7 @@ from leads_engine.runs import recorded_run
 from leads_engine.settings import PROJECT_ROOT, Settings, get_settings
 from leads_engine.universe import pipeline
 from leads_engine.universe import report as rpt
-from leads_engine.universe.load import load_sample, sample_rows
+from leads_engine.universe.load import load, sample_rows
 
 REPORTS_DIR = PROJECT_ROOT / "docs" / "reports"
 
@@ -109,8 +109,9 @@ def cmd_load(args: argparse.Namespace) -> int:
     built = paths.built(cats, cfg.config_hash)
     if not built.exists():
         raise FileNotFoundError(f"built file missing, run `leads universe build`: {built}")
-    with _run(s, cfg, "stage1.load", {"built": str(built)}) as run:
-        run.counts = load_sample(s.database_url, built)
+    scope: Literal["sample", "all"] = "all" if args.all else "sample"
+    with _run(s, cfg, "stage1.load", {"built": str(built), "scope": scope}) as run:
+        run.counts = load(s.database_url, built, scope)
     print(f"load: {run.counts}")
     return 0
 
@@ -181,3 +182,6 @@ def add_parser(groups: Any) -> None:
         )
         sp.add_argument("--dry-run", action="store_true", help="print the plan only")
         sp.add_argument("--force", action="store_true", help="re-extract even if the file exists")
+        sp.add_argument(
+            "--all", action="store_true", help="load: every kept business, not just the sample"
+        )

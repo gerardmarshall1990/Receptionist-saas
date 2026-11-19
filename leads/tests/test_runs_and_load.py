@@ -104,7 +104,34 @@ def test_load_is_idempotent_and_tracks_sample_changes(fresh_db: str, tmp_path: P
 
     second = _built(tmp_path, ["Alpha Plumbing", "Bravo Plumbing"])  # Charlie left the sample
     c2 = load_sample(fresh_db, second)
-    assert c2["removed_from_previous_sample"] == 1
+    assert c2["removed_not_in_scope"] == 1
     with psycopg.connect(fresh_db) as conn:
         names = sorted(r[0] for r in conn.execute("select name from businesses"))
     assert names == ["Alpha Plumbing", "Bravo Plumbing"]
+
+
+@pytest.mark.db
+@needs_db
+def test_load_all_scope_and_contact_status(fresh_db: str, tmp_path: Path) -> None:
+    from leads_engine.universe.load import load
+
+    db.migrate(fresh_db)
+    cfg = load_config(REAL_CONFIG)
+    rows = [
+        raw("a", "Alpha Plumbing", emails=["info@alpha.com"], websites=["alpha.com"]),
+        raw("b", "Bravo Plumbing", phones=None, postcode="78702"),
+        raw("c", "Aspen Dental", code="dental_clinic", postcode="78703"),  # excluded chain
+    ]
+    out = tmp_path / "b.parquet"
+    build(tmp_path / "x", cfg, ["plumbing", "dental"], "2026-11-18.0", out, "s", rows_in=rows)
+    counts = load(fresh_db, out, "all")
+    assert counts["businesses"] == 2  # excluded rows never reach Postgres
+    with psycopg.connect(fresh_db) as conn:
+        got = dict(
+            (n, (ps, es))
+            for n, ps, es in conn.execute("select name, phone_status, email_status from businesses")
+        )
+    assert got == {
+        "Alpha Plumbing": ("unverified", "source_listed"),
+        "Bravo Plumbing": ("none", "none"),
+    }

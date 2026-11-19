@@ -37,6 +37,12 @@ class Settings(BaseSettings):
     dry_run: bool = True
     run_budget_usd: float = Field(default=0.0, ge=0.0)
 
+    # Lead explorer UI. Binds to localhost unless told otherwise. If ui_token is set,
+    # every request must carry it (cookie set via /?token=..., or X-Leads-Token header).
+    ui_host: str = "127.0.0.1"
+    ui_port: int = Field(default=8765, ge=1, le=65535)
+    ui_token: str | None = None
+
     # Optional overrides for config/models.yaml.
     scoring_model: str | None = None
     opener_model: str | None = None

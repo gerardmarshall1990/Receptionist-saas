@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lead Explorer</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <header class="topbar">
+    <button class="icon-btn only-narrow" id="toggle-filters" aria-controls="filters" aria-expanded="false" title="Filters">☰</button>
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">◆</span>
+      <span>Lead Explorer</span>
+    </div>
+    <div class="topbar-meta" id="meta-line">Loading…</div>
+    <div class="topbar-right">
+      <span class="pill pill-muted" id="export-pill" title="">Export locked</span>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="filters" id="filters" aria-label="Filters">
+      <div class="filters-head">
+        <h2>Filters</h2>
+        <button class="link-btn" id="reset">Reset</button>
+      </div>
+      <section class="fgroup">
+        <h3>Category</h3>
+        <div id="f-category" class="checklist"></div>
+      </section>
+      <section class="fgroup" id="g-subcategory" hidden>
+        <h3>Subcategory</h3>
+        <div id="f-subcategory" class="checklist"></div>
+      </section>
+      <section class="fgroup">
+        <h3>Contact</h3>
+        <div id="f-contact" class="tri-list"></div>
+      </section>
+      <section class="fgroup">
+        <h3>Timing</h3>
+        <label class="check"><input type="checkbox" id="f-callable"> <span>Callable now <small class="muted">(in the category's call window, local time)</small></span></label>
+      </section>
+      <section class="fgroup">
+        <h3>Signals &amp; cautions</h3>
+        <p class="hint">Click to require, again to exclude.</p>
+        <div id="f-flags" class="chips"></div>
+      </section>
+      <section class="fgroup">
+        <h3>Tier</h3>
+        <div id="f-tier" class="checklist checklist-row"></div>
+        <p class="hint" id="tier-hint">Scores arrive in Stage 4.</p>
+      </section>
+      <section class="fgroup">
+        <h3>State</h3>
+        <input type="search" id="state-search" class="input input-sm" placeholder="Filter states" aria-label="Filter states">
+        <div id="f-state" class="checklist checklist-scroll"></div>
+      </section>
+      <section class="fgroup">
+        <label class="check"><input type="checkbox" id="f-suppressed"> <span>Show suppressed (opted-out)</span></label>
+      </section>
+    </aside>
+
+    <main class="results">
+      <div class="toolbar">
+        <input type="search" id="q" class="input" placeholder="Search name, city or website" aria-label="Search" autocomplete="off">
+        <div class="toolbar-right">
+          <span class="count" id="count" aria-live="polite"></span>
+          <label class="sort"><span class="muted">Sort</span>
+            <select id="sort" class="input input-sm"></select>
+          </label>
+        </div>
+      </div>
+      <div class="active" id="active"></div>
+      <div class="error" id="error" role="alert" hidden></div>
+      <div class="table-wrap">
+        <table class="leads" id="leads">
+          <thead>
+            <tr>
+              <th>Business</th>
+              <th>Where &amp; when</th>
+              <th>Phone</th>
+              <th>Website</th>
+              <th>Email</th>
+              <th class="num">Locations</th>
+              <th>Flags</th>
+              <th class="num">Score</th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+        <div class="empty" id="empty" hidden>No leads match these filters.</div>
+      </div>
+      <div class="more">
+        <button class="btn" id="more" hidden>Load more</button>
+        <span class="muted small" id="timing"></span>
+      </div>
+    </main>
+
+    <aside class="detail" id="detail" aria-label="Lead detail" hidden>
+      <div class="detail-head">
+        <div>
+          <h2 id="d-name"></h2>
+          <div class="muted" id="d-sub"></div>
+        </div>
+        <button class="icon-btn" id="d-close" title="Close (Esc)" aria-label="Close">✕</button>
+      </div>
+      <div id="d-body" class="detail-body"></div>
+    </aside>
+  </div>
+
+  <dialog id="suppress-dialog" class="dialog">
+    <form method="dialog" id="suppress-form">
+      <h2>Suppress this lead?</h2>
+      <p>This is a <strong>permanent opt-out</strong>. It suppresses the business, every phone number
+        and email on it, and it can't be undone (spec: suppression is permanent).</p>
+      <label class="field">Reason <span class="muted">(required)</span>
+        <textarea id="suppress-reason" class="input" rows="3" minlength="3" maxlength="500" required placeholder="e.g. Owner asked not to be contacted"></textarea>
+      </label>
+      <label class="check" id="suppress-domain-wrap"><input type="checkbox" id="suppress-domain">
+        <span>Also suppress every business on <strong id="suppress-domain-name"></strong></span></label>
+      <div class="dialog-actions">
+        <button type="button" class="btn" id="suppress-cancel">Cancel</button>
+        <button type="submit" class="btn btn-danger" id="suppress-confirm">Suppress permanently</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="/static/app.js" type="module"></script>
+</body>
+</html>

@@ -13,7 +13,7 @@ from collections.abc import Callable, Sequence
 from leads_engine import db, universe_commands
 from leads_engine.config_loader import AppConfig, load_config, resolve_model
 from leads_engine.log import configure_logging, get_logger
-from leads_engine.settings import get_settings
+from leads_engine.settings import PROJECT_ROOT, get_settings
 
 
 def _config_validate(args: argparse.Namespace) -> int:
@@ -66,6 +66,38 @@ def _db_check(args: argparse.Namespace) -> int:
     return 0
 
 
+def _ui_serve(args: argparse.Namespace) -> int:
+    import uvicorn
+
+    from leads_engine.explorer.app import create_app
+
+    s = get_settings()
+    cfg = load_config(s.config_dir)
+    host = args.host or s.ui_host
+    if host not in {"127.0.0.1", "localhost", "::1"} and not s.ui_token:
+        raise ValueError("refusing to listen beyond localhost without LEADS_UI_TOKEN set")
+    port = args.port or s.ui_port
+    get_logger("cli").info(
+        "ui_serving", url=f"http://{host}:{port}/", token_required=bool(s.ui_token)
+    )
+    uvicorn.run(create_app(s, cfg), host=host, port=port, log_level="warning")
+    return 0
+
+
+def _ui_bench(args: argparse.Namespace) -> int:
+    from leads_engine.explorer import bench
+
+    s = get_settings()
+    cfg = load_config(s.config_dir)
+    bench_url = args.bench_url or s.database_url.rsplit("/", 1)[0] + "/frontdesk_leads_bench"
+    out = PROJECT_ROOT / "docs" / "reports" / "explorer-benchmark.md"
+    results = bench.main(s, cfg, bench_url, args.rows, out, reuse=args.reuse)
+    for r in results:
+        print(f"{r['p50']:7.0f} p50 {r['p95']:7.0f} p95 ms  {r['label']}")
+    print(f"report -> {out}")
+    return 0
+
+
 def _db_migrate(args: argparse.Namespace) -> int:
     applied = db.migrate(get_settings().database_url)
     get_logger("cli").info("migrations_applied", applied=applied)
@@ -77,6 +109,8 @@ COMMANDS: dict[tuple[str, str], Callable[[argparse.Namespace], int]] = {
     ("config", "validate"): _config_validate,
     ("db", "check"): _db_check,
     ("db", "migrate"): _db_migrate,
+    ("ui", "serve"): _ui_serve,
+    ("ui", "bench"): _ui_bench,
     **universe_commands.COMMANDS,
 }
 
@@ -90,6 +124,18 @@ def build_parser() -> argparse.ArgumentParser:
     dbp.add_parser("check", help="connect to LEADS_DATABASE_URL")
     dbp.add_parser("migrate", help="apply pending migrations")
     universe_commands.add_parser(groups)
+    uip = groups.add_parser("ui", help="lead explorer web UI").add_subparsers(
+        dest="command", required=True
+    )
+    serve = uip.add_parser("serve", help="serve the explorer (localhost by default)")
+    serve.add_argument("--host", help="bind address (default LEADS_UI_HOST or 127.0.0.1)")
+    serve.add_argument("--port", type=int, help="port (default LEADS_UI_PORT or 8765)")
+    bench = uip.add_parser("bench", help="time the explorer API on a throwaway *_bench DB")
+    bench.add_argument("--rows", type=int, default=3_000_000, help="rows to clone up to")
+    bench.add_argument("--bench-url", help="throwaway DB URL; name must end in _bench")
+    bench.add_argument(
+        "--reuse", action="store_true", help="time an existing bench DB (no re-clone)"
+    )
     return p
 
 

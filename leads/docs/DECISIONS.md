@@ -2,6 +2,21 @@
 
 Newest first. One entry per decision that someone might later ask "why?" about.
 
+## 2026-11-19 — Stage 1b (lead explorer UI)
+
+- **Stack:** FastAPI + plain HTML/CSS/JS served by the same process, inside `leads/`. No build step, no CDN.
+- **Scale:** keyset (cursor) paging; one index per sort; (state|category, score) indexes; trigram search; exact
+  counts up to 50k, labelled planner estimate above; counts/facets cached 60 s (cleared on suppress); facet queries
+  run concurrently. A single GROUPING SETS facet query was measured and rejected (slower: no parallel hash agg).
+  Result at 3M rows: every call p95 < 300 ms (worst 181 ms), `docs/reports/explorer-benchmark.md`.
+- **"Callable now"** is computed in Python per (category, time zone) and matched in SQL (was 3.4 s per-row).
+- **Suppress** is the only write: business id + every phone + every email (+ optionally the domain), permanent.
+  State-changing calls must be JSON (blocks cross-site form posts); token cookie is HttpOnly + SameSite=Strict.
+- **No export** in the UI until the Stage 5 compliance gate (spec section 7).
+- **All 233,798 kept businesses** can be loaded (`load --all`); loading is set-based (COPY), ~70 s.
+- **`reasons` table** (spec section 3) created now so the UI contract exists before Stage 2 writes to it.
+- Hosting is not decided: this container's Postgres is reset on restart. Plan hosting separately.
+
 ## 2026-11-19 — Stage 1 (universe pilot)
 
 - **Source:** Overture Maps Places, release `2026-11-18.0` (pinned in `global.yaml`), read straight from the public
