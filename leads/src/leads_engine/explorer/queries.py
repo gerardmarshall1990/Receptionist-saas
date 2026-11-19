@@ -50,6 +50,31 @@ FLAG_LABELS: dict[str, str] = {
     "name_repeated_review": "Name repeated in many places (review)",
     "generic_name": "Generic listing name",
     "subdomain_platform": "Site on a website-builder subdomain",
+    # Stage 2 (crawl)
+    "uses_answering_service": "Already has answering service / AI (disqualified)",
+    "franchise_disclaimer": "Franchise disclaimer on site (disqualified)",
+    "website_mismatch": "Website doesn't match the business",
+    "phone_not_on_site": "Listed phone not on their website",
+    "crawl_blocked": "Website blocked our crawler",
+    "robots_disallowed": "robots.txt disallows crawling",
+    "website_parked": "Website parked / for sale",
+    "website_offsite": "Website redirects elsewhere",
+    "thin_homepage": "Homepage nearly empty (JS-only?)",
+}
+
+# Signals the explorer can filter on ("has evidence for"), from the Stage 2 crawl.
+SIGNAL_FILTERS: dict[str, str] = {
+    "leave_message_text": "Says 'leave a message' / call-back",
+    "emergency_247_claim": "Advertises 24/7 / emergency",
+    "phone_only_booking": "Phone-only booking",
+    "no_online_booking": "No online booking",
+    "no_chat_widget": "No chat widget",
+    "limited_hours_text": "Limited hours",
+    "hiring_receptionist": "Hiring front desk / dispatcher",
+    "single_phone_number": "Single phone number",
+    "owner_operated": "Owner / family operated",
+    "pricing_hints": "Publishes prices",
+    "multiple_locations": "Mentions multiple locations",
 }
 
 Tri = bool | None
@@ -76,6 +101,7 @@ class Filters:
     has_email: Tri = None
     flags_any: tuple[str, ...] = ()
     flags_none: tuple[str, ...] = ()
+    signals: tuple[str, ...] = ()
     callable_now: bool = False
     include_suppressed: bool = False
     # Filled by the API, not by users:
@@ -151,6 +177,12 @@ def build_where(f: Filters, cfg: AppConfig) -> Where:
         w.add("b.flags && %s::text[]", list(f.flags_any))
     if f.flags_none:
         w.add("not (b.flags && %s::text[])", list(f.flags_none))
+    for name in f.signals:  # each selected signal is required (with evidence)
+        w.add(
+            "exists (select 1 from signals s"
+            " where s.business_id = b.id and s.signal = %s and s.value)",
+            name,
+        )
     if not f.include_suppressed:
         sp = f.suppressed
         if sp.business_ids:

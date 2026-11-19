@@ -125,7 +125,12 @@ def normalize_website(raw: str | None, cfg: Normalization) -> Website | None:
     domain = host if reg in cfg.hosted_site_domains else reg
     scheme = parts.scheme if parts.scheme in {"http", "https"} else "http"
     path = parts.path if parts.path not in {"", "/"} else ""
-    return Website(raw, f"{scheme}://{parts.hostname}{path}", domain, None, host)
+    try:
+        port = parts.port
+    except ValueError:
+        return Website(raw, None, None, "unparseable")
+    netloc = f"{parts.hostname}:{port}" if port else str(parts.hostname)
+    return Website(raw, f"{scheme}://{netloc}{path}", domain, None, host)
 
 
 def first_business_site(

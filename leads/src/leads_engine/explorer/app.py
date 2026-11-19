@@ -124,6 +124,7 @@ def create_app(
         tier: Annotated[list[str], Query()] = [],  # noqa: B006
         flag: Annotated[list[str], Query()] = [],  # noqa: B006
         not_flag: Annotated[list[str], Query()] = [],  # noqa: B006
+        signal: Annotated[list[str], Query()] = [],  # noqa: B006
         q: Annotated[str | None, Query(max_length=100)] = None,
         has_phone: Tri | None = None,
         has_website: Tri | None = None,
@@ -139,6 +140,7 @@ def create_app(
             ("tier", tier, {"A", "B", "C", "D"}),
             ("flag", flag, set(qx.FLAG_LABELS)),
             ("not_flag", not_flag, set(qx.FLAG_LABELS)),
+            ("signal", signal, set(qx.SIGNAL_FILTERS)),
         )
         for name, values, allowed in checks:
             bad = sorted(set(values) - allowed)
@@ -155,7 +157,7 @@ def create_app(
             category=tuple(category), subcategory=tuple(subcategory), state=tuple(state),
             tier=tuple(tier), q=q, has_phone=_tri(has_phone), has_website=_tri(has_website),
             has_email=_tri(has_email), flags_any=tuple(flag), flags_none=tuple(not_flag),
-            callable_now=callable_now, include_suppressed=include_suppressed,
+            signals=tuple(signal), callable_now=callable_now, include_suppressed=include_suppressed,
         )  # fmt: skip
 
     F = Annotated[qx.Filters, Depends(filters)]
@@ -233,6 +235,7 @@ def create_app(
             ],
             "states": sorted(US_STATES),
             "flags": [{"key": k, "label": v} for k, v in qx.FLAG_LABELS.items()],
+            "signals": [{"key": k, "label": v} for k, v in qx.SIGNAL_FILTERS.items()],
             "sorts": [{"key": k, "label": s.label} for k, s in qx.SORTS.items()],
             "export": {
                 "enabled": False,
@@ -368,6 +371,11 @@ def create_app(
                 " where business_id = %s order by weight desc, id",
                 (lead_id,),
             ).fetchall()
+            signal_rows = c.execute(
+                "select signal, value, count, evidence, source_url, extractor_version from signals"
+                " where business_id = %s order by value desc, signal",
+                (lead_id,),
+            ).fetchall()
             supp = c.execute(
                 "select match_type, match_value, reason, source, created_at from suppression"
                 " where (match_type = 'business_id' and match_value = %s)"
@@ -383,6 +391,7 @@ def create_app(
             "phones": [{k: _jsonable(v) for k, v in p.items()} for p in phones],
             "emails": emails,
             "reasons": [{k: _jsonable(v) for k, v in r.items()} for r in reasons],
+            "signals": signal_rows,
             "facts": fx.facts_for(b, phones, emails),
             "suppression": supp,
             "local_time": lt.strftime("%a %H:%M") if lt else None,

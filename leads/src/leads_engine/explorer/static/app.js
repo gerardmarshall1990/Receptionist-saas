@@ -27,12 +27,12 @@ function safeUrl(u) {
 }
 
 const fmt = new Intl.NumberFormat();
-const ARRAY_KEYS = ["category", "subcategory", "state", "tier", "flag", "not_flag"];
+const ARRAY_KEYS = ["category", "subcategory", "state", "tier", "flag", "not_flag", "signal"];
 const TRI_KEYS = [["has_phone", "Phone"], ["has_website", "Website"], ["has_email", "Email"]];
 
 function blankState() {
   return {
-    category: [], subcategory: [], state: [], tier: [], flag: [], not_flag: [],
+    category: [], subcategory: [], state: [], tier: [], flag: [], not_flag: [], signal: [],
     q: "", has_phone: "", has_website: "", has_email: "",
     callable_now: false, include_suppressed: false, sort: "score", lead: "",
   };
@@ -108,6 +108,7 @@ function labelFor(kind, value) {
     }
   }
   if (kind === "flag" || kind === "not_flag") return META.flags.find((f) => f.key === value)?.label ?? value;
+  if (kind === "signal") return META.signals.find((f) => f.key === value)?.label ?? value;
   return value;
 }
 
@@ -174,6 +175,11 @@ function renderFilters() {
     }, f.label);
   }));
 
+  $("#f-signals").replaceChildren(...META.signals.map((sg) => el("button", {
+    type: "button", class: "chip", dataset: { mode: state.signal.includes(sg.key) ? "on" : "" },
+    onclick: () => { toggleIn(state.signal, sg.key); refresh(); },
+  }, sg.label)));
+
   renderChecklist($("#f-tier"), "tier", ["A", "B", "C", "D"].map((t) => ({ value: t, label: t })));
   const scored = (facets.tier || []).some((f) => f.value);
   $("#tier-hint").hidden = scored;
@@ -196,7 +202,7 @@ function renderActive() {
   const chips = [];
   for (const k of ARRAY_KEYS) {
     for (const v of state[k]) {
-      const prefix = k === "not_flag" ? "Not: " : k === "tier" ? "Tier " : "";
+      const prefix = k === "not_flag" ? "Not: " : k === "tier" ? "Tier " : k === "signal" ? "Evidence: " : "";
       chips.push(el("button", { type: "button", class: "chip",
         onclick: () => { state[k] = state[k].filter((x) => x !== v); if (k === "category") pruneSubcategories(); refresh(); } },
         prefix + labelFor(k, v)));
@@ -235,6 +241,12 @@ function emailPill(status) {
 }
 
 const FLAG_SHORT = {
+  uses_answering_service: ["pill-bad", "has answering svc"],
+  franchise_disclaimer: ["pill-bad", "franchise"],
+  website_mismatch: ["pill-warn", "site mismatch"],
+  crawl_blocked: ["pill-muted", "site blocked us"],
+  website_parked: ["pill-bad", "site parked"],
+  thin_homepage: ["pill-muted", "JS-only site?"],
   multiple_locations: ["pill-accent", "multi-location"],
   shared_phone: ["pill-warn", "shared phone"],
   name_repeated_review: ["pill-warn", "check chain"],
@@ -362,6 +374,18 @@ function renderDetail(d) {
       "No evidence collected yet. Pain signals (e.g. “leave a message”, phone-only booking, 24/7 claims, review complaints) are added by the website crawl in Stage 2, each with the quoted text and the page it came from."));
   }
   body.push(why);
+
+  if (d.signals && d.signals.length) {
+    body.push(section("Signals found on their website",
+      el("table", { class: "subtable" }, el("tbody", {}, d.signals.map((sg) => {
+        const src = sg.source_url && safeUrl(sg.source_url);
+        return el("tr", {},
+          el("td", {}, el("span", { class: `pill ${sg.value ? "pill-accent" : "pill-muted"}` }, sg.value ? "yes" : "no")),
+          el("td", {}, el("div", {}, sg.signal.replaceAll("_", " ")),
+            el("div", { class: "muted small" }, sg.evidence || ""),
+            src ? el("a", { href: src, target: "_blank", rel: "noopener noreferrer nofollow", class: "small" }, "page") : null));
+      })))));
+  }
 
   body.push(section("What we know so far",
     el("ul", { class: "facts" }, d.facts.map((f) => el("li", {}, el("span", { class: `pill ${FACT_PILL[f.kind]}` }, f.kind), el("span", {}, f.text))))));

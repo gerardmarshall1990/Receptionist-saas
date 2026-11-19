@@ -10,7 +10,7 @@ import argparse
 import sys
 from collections.abc import Callable, Sequence
 
-from leads_engine import db, universe_commands
+from leads_engine import crawl_commands, db, universe_commands
 from leads_engine.config_loader import AppConfig, load_config, resolve_model
 from leads_engine.log import configure_logging, get_logger
 from leads_engine.settings import PROJECT_ROOT, get_settings
@@ -112,6 +112,7 @@ COMMANDS: dict[tuple[str, str], Callable[[argparse.Namespace], int]] = {
     ("ui", "serve"): _ui_serve,
     ("ui", "bench"): _ui_bench,
     **universe_commands.COMMANDS,
+    **crawl_commands.COMMANDS,
 }
 
 
@@ -124,6 +125,7 @@ def build_parser() -> argparse.ArgumentParser:
     dbp.add_parser("check", help="connect to LEADS_DATABASE_URL")
     dbp.add_parser("migrate", help="apply pending migrations")
     universe_commands.add_parser(groups)
+    crawl_commands.add_parser(groups)
     uip = groups.add_parser("ui", help="lead explorer web UI").add_subparsers(
         dest="command", required=True
     )

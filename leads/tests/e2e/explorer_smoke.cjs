@@ -29,7 +29,7 @@ function check(cond, msg) {
   check(page.url().includes("category=dental"), "filter is in the URL");
   check(await page.isVisible("#g-subcategory"), "subcategory filter appears for chosen category");
 
-  await page.locator(".chip", { hasText: "Multiple locations" }).first().click();
+  await page.locator("#f-flags .chip", { hasText: "Multiple locations" }).click();
   await page.waitForFunction(() => document.querySelector("#count").textContent.includes("3 leads"));
   check(true, "flag filter narrows to the multi-location group");
 

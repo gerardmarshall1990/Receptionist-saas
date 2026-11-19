@@ -216,3 +216,12 @@ def test_email_classification() -> None:
     bad = nz.classify_email("not-an-email", None, NORM)
     assert not bad.syntax_ok
     assert "bad_syntax" in bad.flags
+
+
+def test_website_keeps_port_and_rejects_bad_port() -> None:
+    site = nz.normalize_website("http://shop.example.com:8080/x", NORM)
+    assert site is not None
+    assert site.url == "http://shop.example.com:8080/x"
+    bad = nz.normalize_website("http://example.com:99999/", NORM)
+    assert bad is not None
+    assert bad.domain is None

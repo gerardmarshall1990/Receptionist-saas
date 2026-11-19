@@ -1,0 +1,116 @@
+# Stage 2 crawler + signal rules. Politeness limits are floors, not targets:
+# lowering delays or raising per-site pages needs a reason in docs/DECISIONS.md.
+version: 1
+
+# No contact link: the user chose not to publish one. Do not put personal data here.
+user_agent: "FrontdeskLeadsBot/0.1"
+robots_agent: "FrontdeskLeadsBot"
+
+concurrency_sites: 32        # different sites fetched in parallel
+per_site_delay_s: 2.0        # minimum gap between two requests to the same site
+max_pages_per_site: 5        # homepage + up to 4 chosen internal pages
+max_bytes: 2000000           # stop reading a response beyond this
+timeout_s: 15
+max_redirects: 5
+max_attempts: 3              # network errors only; blocks are never retried
+
+# Internal pages worth fetching, by link text or URL path. Highest score first,
+# at most one page per kind.
+link_kinds:
+  contact: [contact, contact-us, "get in touch", reach us]
+  booking: [book, booking, schedule, appointment, request service, request-service]
+  careers: [career, careers, jobs, employment, hiring, join our team, join-our-team]
+  about: [about, about-us, our story, who we are, our team, meet the team]
+  services: [services, our services, what we do]
+link_kind_priority: [contact, booking, careers, about, services]
+
+# Bot-protection / challenge pages. A hit marks the site "blocked": we stop and
+# never retry or evade (spec section 7).
+block_markers:
+  - "just a moment..."
+  - "attention required! | cloudflare"
+  - "cf-browser-verification"
+  - "captcha"
+  - "px-captcha"
+  - "are you a robot"
+  - "access denied"
+  - "request unsuccessful. incapsula"
+  - "ddos protection by"
+
+# Parked / for-sale domains: the website doesn't work for this business.
+parked_markers:
+  - "this domain is for sale"
+  - "domain is for sale"
+  - "buy this domain"
+  - "this domain may be for sale"
+  - "parked free, courtesy of"
+  - "domain has expired"
+  - "hugedomains.com"
+  - "sedoparking"
+
+# Script/iframe/link signatures (lowercase substrings of the raw HTML).
+booking_signatures:
+  - calendly.com
+  - acuityscheduling.com
+  - squareup.com/appointments
+  - square.site/book
+  - book.housecallpro.com
+  - housecallpro.com/book
+  - clienthub.getjobber.com
+  - getjobber.com/booking
+  - servicetitan.com/schedule
+  - scheduler.servicetitan.com
+  - schedulingengine.com
+  - zocdoc.com
+  - localmed.com
+  - nexhealth.com
+  - lighthouse360
+  - opendental.com/webschedule
+  - flexbook.me
+  - demandforce.com/b/
+  - weave.com/schedule
+  - patientpop.com
+  - setmore.com
+  - vagaro.com
+  - booksy.com
+  - simplybook.me
+  - youcanbook.me
+  - fieldedge.com
+  - workiz.com
+  - servicefusion.com
+  - mydentalwebsite.com/request
+  - sikkasoft.com
+  - modento.io
+  - yapi.me
+  - schedule online
+  - book online
+  - request an appointment
+  - request appointment
+  - book now
+  - schedule now
+  - schedule service online
+
+chat_signatures:
+  - widget.intercom.io
+  - js.driftt.com
+  - embed.tawk.to
+  - cdn.livechatinc.com
+  - podium.com
+  - connect.podium.com
+  - birdeye.com
+  - js.hs-scripts.com
+  - js.usemessages.com
+  - static.zdassets.com
+  - client.crisp.chat
+  - code.tidio.co
+  - olark.com
+  - wchat.freshchat.com
+  - smith.ai
+  - ruby.com
+  - leadconnectorhq.com
+  - msgsndr.com
+  - textline
+  - "web chat"
+  - "live chat"
+  - "chat with us"
+  - "text us"

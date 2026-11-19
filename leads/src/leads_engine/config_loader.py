@@ -410,10 +410,43 @@ class CategoryConfig(Strict):
 # ------------------------------------------------------------------- bundle
 
 
+class CrawlConfig(Strict):
+    """config/crawl.yaml: politeness limits (floors enforced here) and signal signatures."""
+
+    version: int
+    user_agent: Annotated[str, StringConstraints(min_length=3, max_length=200)]
+    robots_agent: Annotated[str, StringConstraints(min_length=3, max_length=60)]
+    concurrency_sites: Annotated[int, Field(ge=1, le=64)]
+    per_site_delay_s: Annotated[float, Field(ge=1.0)]  # never hammer a small business site
+    max_pages_per_site: Annotated[int, Field(ge=1, le=10)]
+    max_bytes: Annotated[int, Field(ge=50_000, le=10_000_000)]
+    timeout_s: Annotated[float, Field(gt=0, le=60)]
+    max_redirects: Annotated[int, Field(ge=0, le=10)]
+    max_attempts: Annotated[int, Field(ge=1, le=5)]
+    link_kinds: dict[Slug, list[Keyword]]
+    link_kind_priority: list[Slug]
+    block_markers: list[Keyword]
+    parked_markers: list[Keyword]
+    booking_signatures: list[Keyword]
+    chat_signatures: list[Keyword]
+
+    @field_validator("block_markers", "parked_markers", "booking_signatures", "chat_signatures")
+    @classmethod
+    def _lower(cls, v: list[str]) -> list[str]:
+        return _unique_lower(v, "crawl signature list")
+
+    @model_validator(mode="after")
+    def _kinds(self) -> Self:
+        if set(self.link_kind_priority) != set(self.link_kinds):
+            raise ValueError("link_kind_priority must list exactly the link_kinds")
+        return self
+
+
 class AppConfig(Strict):
     global_: GlobalConfig
     scoring: ScoringConfig
     models: ModelsConfig
+    crawl: CrawlConfig
     categories: dict[str, CategoryConfig]
     config_hash: str
 
@@ -488,6 +521,7 @@ def load_config(config_dir: Path) -> AppConfig:
         "global": _read_yaml(config_dir / "global.yaml"),
         "scoring": _read_yaml(config_dir / "scoring.yaml"),
         "models": _read_yaml(config_dir / "models.yaml"),
+        "crawl": _read_yaml(config_dir / "crawl.yaml"),
         "categories": {},
     }
     categories: dict[str, CategoryConfig] = {}
@@ -505,6 +539,7 @@ def load_config(config_dir: Path) -> AppConfig:
         global_=GlobalConfig.model_validate(raw["global"]),
         scoring=ScoringConfig.model_validate(raw["scoring"]),
         models=ModelsConfig.model_validate(raw["models"]),
+        crawl=CrawlConfig.model_validate(raw["crawl"]),
         categories=categories,
         config_hash=_hash(raw),
     )
