@@ -22,8 +22,9 @@ Read first: `docs/MASTER-SPEC.md` (the spec), `docs/ICP.md` (who we target), `do
 One stage at a time (spec §9): explore -> plan -> **wait for approval** -> implement with tests -> verify -> report
 (done / tested / untested / gaps / open questions) -> **wait for "verified"**. Commit after each green stage. Ask before adding scope.
 
-Current status: **Stage 1b (lead explorer UI) done, awaiting "verified"**. Stage 1 verified.
-Reports: `docs/reports/stage1-pilot-<release>.md`, `docs/reports/explorer-benchmark.md` (3M rows). Next: Stage 2 crawl plan.
+Current status: **Stage 2 (crawl + signals, pilot) in review**. Stages 0, 1, 1b verified.
+Reports: `docs/reports/stage1-pilot-*.md`, `docs/reports/explorer-benchmark.md`, `docs/reports/stage2-crawl-pilot.md`,
+`docs/reports/stage2-precision.md`. Next: Stage 3 verification (T2/T4) plan.
 
 ## Commands
 
@@ -65,6 +66,14 @@ uv run leads ui serve            # localhost only; set LEADS_UI_TOKEN to allow -
 uv run leads ui bench            # clones the DB to a throwaway *_bench DB at 3M rows, times the API,
                                  # writes docs/reports/explorer-benchmark.md (--reuse to skip re-cloning)
 
+# Stage 2: polite crawl of the pilot's websites, then signals from the saved HTML ($0)
+uv run leads crawl enqueue       # one queue row per website (sites shared by locations are crawled once)
+uv run leads crawl run --dry-run
+uv run leads crawl run --max-sites 1000 --minutes 60   # resumable; safe to run 2 workers in parallel
+uv run leads crawl status
+uv run leads crawl extract       # no network: re-run after changing extract.py rules
+uv run leads crawl report        # docs/reports/stage2-crawl-pilot.md (incl. 100-hit review sample)
+
 # browser test (needs node + playwright; runs inside pytest when TEST_DATABASE_URL is set)
 LEADS_E2E_SCREENSHOTS=/some/dir uv run pytest tests/test_explorer_e2e.py -s
 ```
@@ -93,6 +102,8 @@ src/leads_engine/log.py       structlog JSON logging; bind_run(run_id, stage) at
 src/leads_engine/db.py        Postgres connect + migration runner; DuckDB for Parquet
 src/leads_engine/cli.py       `leads` command (+ universe_commands.py)
 src/leads_engine/runs.py      every job records a `runs` row; hard budget stop
+src/leads_engine/crawl/       fetcher.py (one site, politeness), runner.py (queue + Parquet page store),
+                              html.py (parse), extract.py (signal rules), store.py (DB writes), report.py
 src/leads_engine/explorer/    app.py (FastAPI API + auth/CSP), queries.py (whitelisted SQL, keyset paging),
                               facts.py (Stage 1 facts, call windows), bench.py, static/ (no-build UI)
 src/leads_engine/universe/    overture.py (remote read), normalize.py (pure), build.py (exclude/chain/dedupe/
@@ -118,6 +129,14 @@ data/                         raw/derived bulk files (Parquet). Gitignored. Neve
   data only as text. "Why this lead" shows ONLY rows from the `reasons` table (evidence + source URL); Stage 1
   facts are shown separately and restate stored fields. No export until the Stage 5 compliance gate.
   Re-run `leads ui bench` after changing queries or indexes; target p95 < 300 ms at 3M rows.
+- **Crawler rules (spec section 7):** robots.txt first (401/403 = disallow all, 5xx = retry later), Crawl-delay
+  honored, one request at a time per site and >= per_site_delay_s apart, <= max_pages_per_site, same site only.
+  403/429/202/other WAF-style answers and challenge pages = `blocked`: stop, never retry, never evade (no UA
+  rotation, no proxies, no JS challenge solving, no decoding of obfuscated emails). Limits live in
+  `config/crawl.yaml`; the loader refuses delays under 1 s.
+- **Signal rules change only with evidence:** grade a fresh random sample of hits by hand, fix the rule, add every
+  false positive you found as a regression test in `tests/test_crawl_extract.py`, bump `EXTRACTOR_VERSION`,
+  re-run `leads crawl extract`. A signal under ~90% precision is not used for scoring.
 - **Overture release** is pinned in `global.yaml`. Bumping it requires `leads universe census` and re-confirming codes.
 - **Tests that need fixtures** (saved HTML etc.) go in `tests/fixtures/`. Never hit the network in tests.
 

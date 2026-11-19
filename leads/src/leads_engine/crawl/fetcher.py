@@ -26,6 +26,8 @@ from leads_engine.crawl.html import Page, candidate_links, parse, same_site
 
 Sleep = Callable[[float], Awaitable[None]]
 MAX_CRAWL_DELAY_S = 30.0  # a site asking for more gets its homepage only
+# Our own client ran out of connections: not the site's fault, must not use up its attempts.
+LOCAL_ERROR = "local: connection pool timeout"
 
 
 @dataclass
@@ -142,6 +144,8 @@ async def _robots(
     rp = urllib.robotparser.RobotFileParser()
     try:
         resp = await client.get(urllib.parse.urljoin(base, "/robots.txt"))
+    except httpx.PoolTimeout:
+        return None, LOCAL_ERROR, True
     except httpx.HTTPError as exc:
         return None, f"robots.txt unreachable: {type(exc).__name__}", True
     if resp.status_code in {401, 403}:
@@ -194,6 +198,9 @@ async def crawl_site(
         await pacer.wait()
         try:
             f = await _get(client, url, cfg, kind)
+        except httpx.PoolTimeout:
+            result.status, result.detail, result.retryable = "error", LOCAL_ERROR, True
+            return result
         except httpx.HTTPError as exc:
             if kind == "home":
                 result.status, result.detail, result.retryable = (
@@ -240,11 +247,15 @@ async def crawl_site(
 def make_client(cfg: CrawlConfig) -> httpx.AsyncClient:
     return httpx.AsyncClient(
         headers={"User-Agent": cfg.user_agent, "Accept": "text/html,application/xhtml+xml"},
-        timeout=httpx.Timeout(cfg.timeout_s),
+        # pool=60: waiting for a free connection is our bottleneck, not the site's fault.
+        timeout=httpx.Timeout(cfg.timeout_s, pool=60.0),
         follow_redirects=True,
         max_redirects=cfg.max_redirects,
+        # Every site is a different host, so idle keep-alive connections only block the
+        # pool: expire them fast (v1 ran out of connections -> PoolTimeout).
         limits=httpx.Limits(
-            max_connections=cfg.concurrency_sites * 2,
+            max_connections=cfg.concurrency_sites * 4,
             max_keepalive_connections=cfg.concurrency_sites,
+            keepalive_expiry=5.0,
         ),
     )

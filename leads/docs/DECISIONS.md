@@ -2,6 +2,25 @@
 
 Newest first. One entry per decision that someone might later ask "why?" about.
 
+## 2026-11-19 — Stage 2 (crawl + signals, pilot)
+
+- **Bot identity:** `FrontdeskLeadsBot/0.1`, no contact link (user chose not to publish one).
+- **Unit of work = website**, not business: 20k pilot businesses -> 15,399 sites; shared sites crawled once.
+- **HTML is kept** (gzipped Parquet, gitignored) so rules can be fixed and re-extracted without re-crawling.
+  At 3M scale that is TBs: store extracted text/features only, or object storage (decide in Stage 7).
+- **Conservative block rules:** 403/429, 202 and other non-404 4xx on a page = blocked (WAFs answer bots that
+  way); challenge = marker in <title>, or in the body of a near-empty page only (reCAPTCHA in a contact form is
+  not a block). 19 sites from the first batch reclassified error -> blocked when this was found.
+- **Playwright not used.** JS-only sites are flagged `thin_homepage` and measured; decide later if worth it.
+- **Precision loop:** v1 -> v3 after two blind hand reviews (see stage2-precision.md). Biggest catches:
+  "answering service" disqualified businesses that say they *don't* use one (negation); "leave a message"
+  fired on web-form labels; "independently owned and operated" is a franchise disclaimer, not independence.
+- **New caution flag `promises_live_answer`:** sites that sell on "a real person always answers". Not a
+  disqualifier, but likely a weaker fit for an AI receptionist; Stage 6 outcomes will tell.
+- **Phone corroboration:** Overture phone also on the business's own site -> agree_count 2, status `likely`.
+  `verified` stays reserved for the paid line-type lookup (Stage 3), per spec section 6.
+- **Two crawl workers** ran in parallel to finish the pilot in time; politeness is per site and unaffected.
+
 ## 2026-11-19 — Stage 1b (lead explorer UI)
 
 - **Stack:** FastAPI + plain HTML/CSS/JS served by the same process, inside `leads/`. No build step, no CDN.

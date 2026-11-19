@@ -145,3 +145,19 @@ def test_queue_claims_respect_status_and_stale_locks(fresh_db: str) -> None:
         conn.execute("update crawl_sites set next_attempt_at = now() - interval '1 minute'")
         got = {d for d, _ in runner.claim(conn, "w", 100, max_attempts=3)}
     assert got == {"pending.test", "stale.test", "retry.test"}  # never blocked/done/fresh/spent
+
+
+def test_local_pool_timeout_does_not_use_up_an_attempt(fresh_db: str, tmp_path: Path) -> None:
+    from leads_engine.crawl.fetcher import LOCAL_ERROR, SiteResult
+
+    db.migrate(fresh_db)
+    with psycopg.connect(fresh_db, autocommit=True) as conn:
+        conn.execute(
+            "insert into crawl_sites (domain, start_url) values ('a.test', 'http://a.test/')"
+        )
+        assert runner.claim(conn, "w", 1, 3) == [("a.test", "http://a.test/")]
+        buf = runner.Buffer(tmp_path, "run")
+        buf.add(SiteResult("a.test", "error", detail=LOCAL_ERROR, retryable=True))
+        buf.flush(conn, 3)
+        row = conn.execute("select status, attempts from crawl_sites").fetchone()
+    assert row == ("pending", 0)

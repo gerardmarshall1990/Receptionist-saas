@@ -22,7 +22,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from leads_engine.config_loader import CrawlConfig
-from leads_engine.crawl.fetcher import Fetched, SiteResult, crawl_site, make_client
+from leads_engine.crawl.fetcher import LOCAL_ERROR, Fetched, SiteResult, crawl_site, make_client
 from leads_engine.log import get_logger
 
 LOCK_STALE = "15 minutes"
@@ -133,6 +133,15 @@ class Buffer:
                          len(p.body), p.content_hash, p.fetched_at, str(path) if path else None),
                     )  # fmt: skip
                 status = r.status
+                if r.detail == LOCAL_ERROR:
+                    # Our side failed: put it back as if never claimed (attempt not counted).
+                    conn.execute(
+                        "update crawl_sites set status = 'pending',"
+                        " attempts = greatest(attempts - 1, 0), locked_by = null, detail = null,"
+                        " updated_at = now() where domain = %s",
+                        (r.domain,),
+                    )
+                    continue
                 if status == "error" and r.retryable:
                     conn.execute(
                         "update crawl_sites set status = 'error', detail = %s, locked_by = null,"
