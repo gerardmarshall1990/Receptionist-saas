@@ -33,7 +33,10 @@ class Page:
 
 
 def _host(url: str) -> str:
-    h = (urllib.parse.urlsplit(url).hostname or "").lower()
+    try:
+        h = (urllib.parse.urlsplit(url).hostname or "").lower()
+    except ValueError:
+        return ""
     return h[4:] if h.startswith("www.") else h
 
 
@@ -56,7 +59,11 @@ def parse(html: str, url: str) -> Page:
             if addr:
                 page.mailto.append(addr)
         elif href and not low.startswith(("javascript:", "#", "data:")):
-            absolute = urllib.parse.urljoin(url, href).split("#")[0]
+            try:
+                absolute = urllib.parse.urljoin(url, href).split("#")[0]
+                urllib.parse.urlsplit(absolute).hostname  # noqa: B018 (validates, e.g. bad IPv6)
+            except ValueError:
+                continue  # malformed link on the page: skip it, keep the page
             if absolute.startswith(("http://", "https://")):
                 page.links.append(Link(absolute, label))
     for bad in doc.xpath("//script|//style|//noscript|//template|//svg"):

@@ -335,3 +335,71 @@ def test_multi_location_vs_chain_scale(text: str, multi: bool, chain: bool) -> N
     s = extract(_p(text), BIZ, CFG).signals
     assert ("multiple_locations" in s) is multi
     assert ("is_chain" in s) is chain
+
+
+def test_malformed_links_are_skipped_not_fatal() -> None:
+    html = '<html><body><a href="http://[broken">x</a><a href="/contact">Contact</a></body></html>'
+    p = parse(html, "https://ok.test/")
+    assert [link.url for link in p.links] == ["https://ok.test/contact"]
+    assert candidate_links(p, "ok.test", CFG.crawl.link_kinds, CFG.crawl.link_kind_priority) == [
+        ("contact", "https://ok.test/contact")
+    ]
+
+
+# ---------------------------------------------- v4 regressions (third hand review)
+
+
+def test_reviews_about_other_companies_are_ignored() -> None:
+    a = extract(
+        _p(
+            "Ron answered my emergency call immediately, unlike 2 other plumbers I called and had to leave a voicemail."
+        ),
+        BIZ,
+        CFG,
+    )
+    assert "leave_message_text" not in a.signals
+    b = extract(
+        _p("The last company I used had AI receptionists and was over-priced. Royal was great."),
+        BIZ,
+        CFG,
+    )
+    assert "uses_answering_service" not in b.signals
+    c = extract(_p("Called, very nice answering service. Fast schedule to come out."), BIZ, CFG)
+    assert c.signals["uses_answering_service"].value  # about THIS business: still counts
+
+
+def test_phone_only_not_when_a_form_is_offered() -> None:
+    s = extract(
+        _p("If you would like to schedule an appointment, call or fill out the contact form."),
+        BIZ,
+        CFG,
+    ).signals
+    assert "phone_only_booking" not in s
+    s2 = extract(
+        _p("Call us today to schedule an appointment. We look forward to it."), BIZ, CFG
+    ).signals
+    assert s2["phone_only_booking"].value
+
+
+@pytest.mark.parametrize(
+    ("text", "chain"),
+    [
+        (
+            "Licensed at scale, but permit consistency varies by franchise owner and local crew.",
+            False,
+        ),
+        ("Each location is independently owned and operated.", True),
+        ("With more than 150 franchise locations globally, our network reaches far.", True),
+        ("Call our franchise owner Dave for details.", True),
+    ],
+)
+def test_franchise_wording_must_be_about_them(text: str, chain: bool) -> None:
+    assert ("is_chain" in extract(_p(text), BIZ, CFG).signals) is chain
+
+
+def test_fire_department_is_not_an_emergency_claim_and_saved_is_not_a_price() -> None:
+    s = extract(
+        _p("Thank You to Watsonville Fire and Emergency Services. He saved me over $300."), BIZ, CFG
+    ).signals
+    assert "emergency_247_claim" not in s
+    assert "pricing_hints" not in s

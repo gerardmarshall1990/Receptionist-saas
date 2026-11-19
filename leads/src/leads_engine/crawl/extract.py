@@ -18,9 +18,8 @@ from leads_engine.config_loader import AppConfig, CategoryConfig
 from leads_engine.crawl.html import Page
 from leads_engine.universe import normalize as nz
 
-EXTRACTOR_VERSION = (
-    "stage2-v3"  # v3: voicemail-as-channel only, n't negation, chain scale, coverage
-)
+# v4: competitor context ignored, a form = online channel, franchise wording must be about them.
+EXTRACTOR_VERSION = "stage2-v4"
 SNIPPET = 300
 
 
@@ -57,6 +56,20 @@ LEAVE_MESSAGE = _rx(
     r"busy with (?:a )?customers?|not available)",
     r"if we (?:miss|can(?:'|\u2019)?t (?:get to|answer)|cannot answer|don(?:'|\u2019)?t answer) your call",
 )  # fmt: skip
+# Reviews that talk about OTHER businesses ("unlike 2 other plumbers I called ...").
+COMPETITOR = _rx(
+    r"\b(?:last|other|another|previous|prior)\s+(?:company|companies|plumbers?|dentists?|contractors?|"
+    r"hvac (?:company|companies)|providers?|offices?|businesses)",
+    r"\bunlike\b",
+)
+# Another online channel next to the "call us" line: not phone-only.
+ONLINE_FORM = _rx(
+    r"fill out (?:the|our|a|this) (?:contact |online |appointment |request )?form",
+    r"form below",
+    r"request (?:it )?online",
+    r"book online",
+    r"(?:email|e-mail) us",
+)
 # Boilerplate that mentions voicemail without saying callers end up there.
 LEAVE_MESSAGE_NOT = _rx(
     r"automatic (?:telephone|phone) dialing",
@@ -65,6 +78,8 @@ LEAVE_MESSAGE_NOT = _rx(
     r"many practices",
     r"your regular dentist",
 )
+LEAVE_MESSAGE_GUARD = _rx(LEAVE_MESSAGE_NOT.pattern, COMPETITOR.pattern)
+
 # Must read as a claim about their service, not "your AC runs 24/7" or "avoid emergency repairs".
 EMERGENCY = _rx(
     r"(?:available|open|on call|service|services|emergenc\w+|answer\w*|respon\w+|here for you|call us)\W{0,25}24 ?[/-] ?7",
@@ -76,6 +91,7 @@ EMERGENCY = _rx(
 EMERGENCY_NOT = _rx(
     r"(?:avoid|prevent|reduce|reducing|costly|expensive|minimi[sz]e)\W+(?:\w+\W+){0,3}$",
     r"(?:running|working|runs|works)\W+$",
+    r"(?:fire|police|medical|county|city)\W+(?:and|&)?\W*$",  # "Fire and Emergency Services"
 )
 # The business already has someone (or something) answering: no 24/7 pain claim then.
 COVERAGE = _rx(
@@ -123,13 +139,14 @@ OWNER_OPERATED = _rx(
 # "Independently owned and operated" is the standard FRANCHISE disclaimer, not independence.
 FRANCHISE = _rx(
     r"(?:each|every) (?:franchise|location|office) is independently owned",
-    r"independently owned and operated franchise", r"franchise (?:location|owner)s?\b",
+    r"independently owned and operated franchise",
+    r"(?:our|this|each|every) franchise (?:location|owner)s?\b", r"\d+\+? franchise locations",
     r"locally owned (?:and operated )?franchise",
     # Scale that only chains/distributors have ("joining over 200 locations nationwide").
     r"(?:over |more than )?\d{2,}\+? (?:locations|offices|branches) (?:nationwide|across (?:the )?(?:us|u\.s\.|country|america))",
 )  # fmt: skip
 PRICING = _rx(
-    r"(?:starting at|starts at|from|only|just|flat[- ]rate|special|coupon|save|price)\D{0,20}\$\s?\d{2,5}",
+    r"(?:starting at|starts at|from|only|just|flat[- ]rate|special|coupon|price)\D{0,20}\$\s?\d{2,5}",
     r"\$\s?\d{2,5}(?:\.\d\d)?\s*(?:off|special|flat rate|service call|diagnostic|exam|cleaning)",
 )  # fmt: skip
 MULTI_LOCATION = _rx(
@@ -253,7 +270,7 @@ def extract(pages: list[Page], business: dict[str, Any], cfg: AppConfig) -> Extr
         if cat
         else None
     )
-    answering = _first(ANSWERING, pages, skip_negated=True)
+    answering = _first(ANSWERING, pages, skip_negated=True, not_near=COMPETITOR)
     # "No answering service: the owner answers every call" is the opposite of a disqualifier,
     # but it is a real caution: they sell on live answering.
     if _any_negated(ANSWERING, pages) or _first(COVERAGE, pages):
@@ -266,7 +283,7 @@ def extract(pages: list[Page], business: dict[str, Any], cfg: AppConfig) -> Extr
         sig["is_chain"] = franchise
 
     # --- pain --------------------------------------------------------------
-    if h := _first(LEAVE_MESSAGE, pages, skip_negated=True, not_near=LEAVE_MESSAGE_NOT):
+    if h := _first(LEAVE_MESSAGE, pages, skip_negated=True, not_near=LEAVE_MESSAGE_GUARD):
         sig["leave_message_text"] = h
     coverage = _first(COVERAGE, pages)
     emergency = _first(EMERGENCY, pages, not_before=EMERGENCY_NOT)
@@ -287,7 +304,7 @@ def extract(pages: list[Page], business: dict[str, Any], cfg: AppConfig) -> Extr
         if chat
         else Hit(True, _checked(pages) + ": no chat or text widget found", home.url)
     )
-    if not booking and (h := _first(PHONE_ONLY, pages)):
+    if not booking and (h := _first(PHONE_ONLY, pages, not_near=ONLINE_FORM)):
         sig["phone_only_booking"] = h
 
     # The role must sit close to the hiring wording, and the evidence must show both.

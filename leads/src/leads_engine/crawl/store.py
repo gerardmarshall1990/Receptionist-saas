@@ -19,6 +19,7 @@ from leads_engine.config_loader import AppConfig
 from leads_engine.crawl.extract import EXTRACTOR_VERSION, Extraction, extract
 from leads_engine.crawl.fetcher import decode
 from leads_engine.crawl.html import parse
+from leads_engine.log import get_logger
 from leads_engine.signals import SIGNALS
 from leads_engine.universe import normalize as nz
 
@@ -32,6 +33,7 @@ STATUS_FLAG = {
     "blocked": "crawl_blocked", "robots_disallowed": "robots_disallowed", "parked": "website_parked",
     "offsite": "website_offsite", "error": "crawl_failed",
 }  # fmt: skip
+log = get_logger("extract")
 TERMINAL = ("done", "blocked", "robots_disallowed", "parked", "offsite", "error")
 
 
@@ -167,13 +169,21 @@ def run_extract(url: str, cfg: AppConfig, data_dir: Path) -> dict[str, int]:
                 " where domain = %s",
                 (domain,),
             ).fetchall()
-            parsed = []
-            for p in pages.get(domain, []):
-                html = decode(gzip.decompress(p["html_gz"]), p["content_type"])
-                parsed.append(parse(html, p["final_url"]))
+            try:
+                parsed = [
+                    parse(decode(gzip.decompress(p["html_gz"]), p["content_type"]), p["final_url"])
+                    for p in pages.get(domain, [])
+                ]
+                exs = [
+                    extract(parsed, b, cfg) if status in {"done", "offsite"} else Extraction()
+                    for b in businesses
+                ]
+            except Exception as exc:  # one odd page must not stop the pass; it is counted
+                log.error("extract_failed", domain=domain, error=f"{type(exc).__name__}: {exc}")
+                counts["extract_errors"] += 1
+                continue
             with conn.transaction(), conn.cursor() as cur:
-                for b in businesses:
-                    ex = extract(parsed, b, cfg) if status in {"done", "offsite"} else Extraction()
+                for b, ex in zip(businesses, exs, strict=True):
                     _write(cur, b, ex, cfg, status)
                     counts["businesses"] += 1
                     counts[f"site_{status}"] += 1
