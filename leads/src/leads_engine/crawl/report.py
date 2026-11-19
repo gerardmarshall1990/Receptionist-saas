@@ -48,12 +48,16 @@ def build_report(url: str, cfg: AppConfig, data_dir: Path) -> str:
             "select status, detail, count(*) n from crawl_sites where status not in ('done', 'pending')"
             " group by 1, 2 order by n desc limit 15"
         ).fetchall()
-        # Politeness evidence from stored fetch times.
+        # Politeness evidence. Idle gap = next request sent - previous response finished.
+        # Pages fetched before requested_at existed (the first pilot run) can't be measured
+        # this way: they were paced start-to-start in code (>= delay between request starts).
         gap = c.execute(
-            "select min(g) as min_gap, percentile_cont(0.5) within group (order by g) as med_gap from ("
-            " select extract(epoch from fetched_at - lag(fetched_at) over (partition by domain order by fetched_at)) g"
+            "select min(g) as min_gap, percentile_cont(0.5) within group (order by g) as med_gap,"
+            " count(*) as pairs from ("
+            " select extract(epoch from requested_at - lag(fetched_at) over (partition by domain order by fetched_at)) g"
             " from pages) t where g is not null"
         ).fetchone()
+        legacy = c.execute("select count(*) as n from pages where requested_at is null").fetchone()
         per_site = c.execute(
             "select max(n) as max_pages from (select count(*) n from pages group by domain) t"
         ).fetchone()
@@ -124,14 +128,16 @@ def build_report(url: str, cfg: AppConfig, data_dir: Path) -> str:
             ["check", "rule", "measured"],
             [
                 [
-                    "min gap between two page fetches on one site",
+                    "idle gap: response finished -> next request to the same site",
                     f">= {cfg.crawl.per_site_delay_s:.1f} s",
-                    f"{gap['min_gap']:.2f} s" if gap and gap["min_gap"] is not None else "-",
+                    f"min {gap['min_gap']:.2f} s, median {gap['med_gap']:.2f} s over {gap['pairs']:,} pairs"
+                    if gap and gap["min_gap"] is not None
+                    else "not measurable for these pages (see next row)",
                 ],
                 [
-                    "median gap",
-                    "",
-                    f"{gap['med_gap']:.2f} s" if gap and gap["med_gap"] is not None else "-",
+                    "pages fetched before request times were recorded",
+                    "paced start-to-start in code: >= delay between request starts",
+                    f"{legacy['n']:,} pages" if legacy else "-",
                 ],
                 [
                     "max pages fetched from one site",

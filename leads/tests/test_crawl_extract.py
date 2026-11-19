@@ -403,3 +403,10 @@ def test_fire_department_is_not_an_emergency_claim_and_saved_is_not_a_price() ->
     ).signals
     assert "emergency_247_claim" not in s
     assert "pricing_hints" not in s
+
+
+def test_name_and_number_below_is_a_form_not_voicemail() -> None:
+    t = "Give us a call right now or leave your name and number below and we will be in touch with you."
+    assert "leave_message_text" not in extract(_p(t), BIZ, CFG).signals
+    t2 = "If you reach our voicemail, leave your name and number and we will call you back."
+    assert extract(_p(t2), BIZ, CFG).signals["leave_message_text"].value

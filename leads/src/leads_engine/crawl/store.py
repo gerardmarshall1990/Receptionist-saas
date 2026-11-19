@@ -44,7 +44,7 @@ def _pages_by_domain(pages_dir: Path) -> dict[str, list[dict[str, Any]]]:
     q = """
     select domain, url, final_url, kind, content_type, html_gz from (
       select *, row_number() over (partition by domain, url order by fetched_at desc) as rn
-      from read_parquet($files)
+      from read_parquet($files, union_by_name = true)
     ) where rn = 1
     """
     rows = (

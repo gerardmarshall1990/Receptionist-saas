@@ -40,6 +40,7 @@ PAGE_SCHEMA = pa.schema(
         ("truncated", pa.bool_()),
         ("content_hash", pa.string()),
         ("fetched_at", pa.timestamp("us", tz="UTC")),
+        ("requested_at", pa.timestamp("us", tz="UTC")),
         ("html_gz", pa.binary()),
     ]
 )
@@ -88,14 +89,15 @@ def _page_row(r: SiteResult, p: Fetched) -> dict[str, Any]:
         "truncated": p.truncated,
         "content_hash": p.content_hash,
         "fetched_at": p.fetched_at,
+        "requested_at": p.requested_at,
         "html_gz": gzip.compress(p.body),
     }
 
 
 _INSERT_PAGE = (
     "insert into pages (domain, url, final_url, kind, http_status, content_type,"
-    " bytes, content_hash, fetched_at, parquet_file)"
-    " values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
+    " bytes, content_hash, fetched_at, requested_at, parquet_file)"
+    " values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"
 )
 
 
@@ -131,7 +133,8 @@ class Buffer:
                     conn.execute(
                         _INSERT_PAGE,
                         (r.domain, p.url, p.final_url, p.kind, p.status, p.content_type,
-                         len(p.body), p.content_hash, p.fetched_at, str(path) if path else None),
+                         len(p.body), p.content_hash, p.fetched_at, p.requested_at,
+                         str(path) if path else None),
                     )  # fmt: skip
                 status = r.status
                 if r.detail == LOCAL_ERROR:

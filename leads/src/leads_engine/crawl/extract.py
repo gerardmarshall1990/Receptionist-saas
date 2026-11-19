@@ -19,7 +19,8 @@ from leads_engine.crawl.html import Page
 from leads_engine.universe import normalize as nz
 
 # v4: competitor context ignored, a form = online channel, franchise wording must be about them.
-EXTRACTOR_VERSION = "stage2-v4"
+# v5: "leave your name and number below" (a web form) is not voicemail.
+EXTRACTOR_VERSION = "stage2-v5"
 SNIPPET = 300
 
 
@@ -72,6 +73,10 @@ ONLINE_FORM = _rx(
 )
 # Boilerplate that mentions voicemail without saying callers end up there.
 LEAVE_MESSAGE_NOT = _rx(
+    # A web form, not a phone line: "leave your name and number below", "Submit".
+    r"\bbelow\b",
+    r"\bform\b",
+    r"\bsubmit\b",
     r"automatic (?:telephone|phone) dialing",
     r"consent",
     r"reminders?",

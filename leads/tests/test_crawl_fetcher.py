@@ -262,3 +262,20 @@ def test_client_identifies_itself() -> None:
     c = client(CRAWL)
     assert c.headers["User-Agent"] == "FrontdeskLeadsBot/0.1"
     asyncio.run(c.aclose())
+
+
+def test_pacer_measures_idle_time_after_the_response_not_start_to_start() -> None:
+    from leads_engine.crawl.fetcher import _Pacer
+
+    clock = FakeClock()
+    pacer = _Pacer(2.0, clock.sleep, clock.now)
+    asyncio.run(pacer.wait())  # first request: no wait
+    clock.t += 1.9  # a slow response: 1.9 s to download
+    pacer.done()
+    asyncio.run(pacer.wait())
+    assert clock.sleeps == [2.0]  # full 2 s idle after the slow response, not 0.1 s
+    clock.t += 0.1
+    pacer.done()
+    clock.t += 5.0  # already idle long enough
+    asyncio.run(pacer.wait())
+    assert clock.sleeps == [2.0]

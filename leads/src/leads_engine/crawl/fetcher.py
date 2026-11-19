@@ -39,7 +39,8 @@ class Fetched:
     content_type: str
     body: bytes
     truncated: bool = False
-    fetched_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    fetched_at: datetime = field(default_factory=lambda: datetime.now(UTC))  # response fully read
+    requested_at: datetime | None = None  # request sent (after the pacing pause)
 
     @property
     def content_hash(self) -> str:
@@ -73,18 +74,23 @@ class SiteResult:
 
 
 class _Pacer:
-    """Enforces the minimum gap between two requests to one site."""
+    """At least `delay` seconds of idle time between the END of one response and the
+    START of the next request to the same site (stricter than start-to-start pacing,
+    which lets a slow site get its next request right after a slow response)."""
 
     def __init__(self, delay: float, sleep: Sleep, clock: Callable[[], float]) -> None:
         self.delay, self.sleep, self.clock = delay, sleep, clock
-        self.last: float | None = None
+        self.last_end: float | None = None
 
     async def wait(self) -> None:
-        if self.last is not None:
-            gap = self.delay - (self.clock() - self.last)
+        if self.last_end is not None:
+            gap = self.delay - (self.clock() - self.last_end)
             if gap > 0:
                 await self.sleep(gap)
-        self.last = self.clock()
+
+    def done(self) -> None:
+        """Call when a response has been fully read (or the request failed)."""
+        self.last_end = self.clock()
 
 
 def _site_host(url: str) -> str:
@@ -182,7 +188,7 @@ async def crawl_site(
     agent = cfg.robots_agent
     crawl_delay = float(rp.crawl_delay(agent) or 0)
     pacer = _Pacer(max(cfg.per_site_delay_s, min(crawl_delay, MAX_CRAWL_DELAY_S)), sleep, clock)
-    pacer.last = clock()  # the robots.txt request counts
+    pacer.done()  # the robots.txt request counts
     max_pages = 1 if crawl_delay > MAX_CRAWL_DELAY_S else cfg.max_pages_per_site
     if not rp.can_fetch(agent, start_url):
         result.status, result.detail = "robots_disallowed", "homepage disallowed by robots.txt"
@@ -196,8 +202,10 @@ async def crawl_site(
             continue
         seen.add(url)
         await pacer.wait()
+        requested_at = datetime.now(UTC)
         try:
             f = await _get(client, url, cfg, kind)
+            f.requested_at = requested_at
         except httpx.PoolTimeout:
             result.status, result.detail, result.retryable = "error", LOCAL_ERROR, True
             return result
@@ -210,6 +218,8 @@ async def crawl_site(
                 )
                 return result
             continue  # an inner page failing doesn't sink the site
+        finally:
+            pacer.done()  # every request, ok or not, starts the idle gap
         # 403/429 and any other non-404/410 4xx (401, 406, 409, 451, vendor codes like 466)
         # plus 202 "accepted" pages are how WAFs answer bots: treat as a block, never retry.
         if f.status in {202, 403, 429} or (400 <= f.status < 500 and f.status not in {404, 410}):

@@ -68,6 +68,14 @@ def test_crawl_and_extract_end_to_end(fresh_db: str, site: Site, tmp_path: Path)
         assert conn.execute("select count(*) from pages").fetchone() == (3,)
         files = conn.execute("select distinct parquet_file from pages").fetchall()
         assert all(Path(f[0]).exists() for f in files)
+        # Politeness measured on real time: idle gap between a response and the next request.
+        gaps = conn.execute(
+            "select extract(epoch from requested_at - lag(fetched_at) over (partition by domain order by fetched_at))"
+            " from pages"
+        ).fetchall()
+        measured = [float(g[0]) for g in gaps if g[0] is not None]
+        assert measured
+        assert min(measured) >= FAST.per_site_delay_s - 0.01
 
     out = run_extract(fresh_db, CFG, tmp_path)
     assert out["businesses"] == 2  # the dead site is still retryable: not extracted yet

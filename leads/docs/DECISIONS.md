@@ -20,6 +20,11 @@ Newest first. One entry per decision that someone might later ask "why?" about.
 - **Phone corroboration:** Overture phone also on the business's own site -> agree_count 2, status `likely`.
   `verified` stays reserved for the paid line-type lookup (Stage 3), per spec section 6.
 - **Two crawl workers** ran in parallel to finish the pilot in time; politeness is per site and unaffected.
+- **Pacing tightened after the pilot crawl:** the pilot was paced start-to-start (>= 2 s between request starts,
+  like Scrapy's download delay), so a slow response could be followed quickly by the next request. Found when
+  the report measured finish-to-finish gaps of 0.04 s (no site was ever fetched by two workers: 0 cross-run
+  pairs). From now on: >= 2 s of idle time after each response, request start times are stored, and the report
+  and an end-to-end test measure that gap. The 33,443 pilot pages can't be re-measured this way.
 
 ## 2026-11-19 — Stage 1b (lead explorer UI)
 
