@@ -19,7 +19,22 @@ If this file and the YAML disagree, the YAML is what runs; fix whichever is wron
 | Reachable | Verified phone (valid, line type known, cross-checked) | `phones.status` (Stage 3) |
 | Need not already solved | No answering service / AI receptionist | `global.yaml: answering_vendor_patterns`, `negative_keywords` |
 
-Hard exclusions (spec §1): shops, travel agencies, chains/franchises, large employers.
+Hard exclusions (spec §1): shops, travel agencies, chains/franchises, large employers. How Stage 1 applies them
+(in this order; first match wins, every excluded row keeps its reason):
+
+| Rule | What it catches |
+|---|---|
+| `closed` | Overture says permanently/temporarily closed |
+| `institution` | website on `.edu` / `.mil` (university clinics, military) |
+| `referral_listing` | "Emergency Dentist 24/7", "Plumber Near Me" (lead-gen listings) |
+| `brand_wikidata` | Overture links the place to a known brand |
+| `chain_name_pattern` | brand at the start of the name ("Aspen Dental - X"), or a `chain_name_contains` brand anywhere |
+| `exclusion_keyword` | supply houses, dental labs, VA/hospital/university-of, answering services |
+| `chain_multi_location` | same website at >= 10 locations (ZIPs) |
+| `chain_name_network` | same name at >= 10 locations and >= 50% of those listings share one website |
+
+Kept but flagged: 2-9 locations (`multiple_locations`, a value signal), phone shared by > 3 listings, generic names,
+names repeated in many places with different websites (`name_repeated_review`).
 
 ## 2. Target categories
 
@@ -87,9 +102,15 @@ Decisions for you (also listed in each YAML's `open_questions`):
 10. Day-of-week and holiday calling restrictions by state.
 
 **Data (answered in Stage 1/2)**
-11. Overture category codes are written from memory and marked `unconfirmed`. Stage 1 checks them against the
-    release's taxonomy before any query.
-12. Chain lists are hand-seeded and incomplete. Stage 1 can find more by spotting names repeated across many cities.
+11. ~~Overture codes unconfirmed~~ **Answered in Stage 1:** all 7 categories confirmed against release 2026-11-18.0
+    (`docs/reports/taxonomy-2026-11-18.0.md`).
+12. Chain lists are still hand-seeded, but Stage 1 now detects chains by shared website domain and name networks,
+    and the report lists the top candidates for review.
+16. **3M looks out of reach with these 7 categories.** US has ~931k raw listings across all 7 (~690k after the pilot's
+    ~74% keep rate); CA/AU/UK add perhaps 250-350k. Reaching 3M needs the watch-list categories (or more). Do we
+    redefine the target as "every reachable, qualified business in the ICP" or add categories?
+17. Law: 113k US firms carry only the generic `attorney_or_law_firm` code. They're kept as `practice_unknown`
+    until the Stage 2 crawl shows the practice area.
 13. All value weights, keyword sets and call windows are starting guesses until outcome data arrives.
 
 **Tactics to test (Stage 6+)**

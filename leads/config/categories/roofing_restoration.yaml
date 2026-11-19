@@ -12,17 +12,30 @@ why_converts:
   - "Very high ticket (roofs $10k+, restoration often insurance-paid $5k-$50k)."
 
 source_codes:
-  status: unconfirmed
-  overture: [roofing, damage_restoration, water_damage_restoration, fire_and_water_damage_restoration, mold_remediation]
+  status: confirmed
+  overture_release: "2026-11-18.0"
   osm: ["craft=roofer"]
-  note: "OSM has no standard tag for damage restoration. Verify Overture codes in Stage 1."
+  note: "No Overture code for mold remediation; OSM has no tag for damage restoration."
 
 subcategories:
-  - {slug: roofing, label: Roofing contractor, include: true}
-  - {slug: water_fire_restoration, label: Water/fire damage restoration, include: true}
-  - {slug: mold_remediation, label: Mold remediation, include: true, reason: "Usually the same firms as water restoration."}
-  - {slug: gutters_only, label: Gutters only, include: false, reason: "Low ticket, not urgent."}
-  - {slug: roofing_supply, label: Roofing supply, include: false, reason: "Shop/distributor."}
+  - slug: roofing
+    label: "Roofing contractor"
+    include: true
+    overture_codes: [roofing, ceiling_and_roofing_repair_and_service]
+  - slug: water_fire_restoration
+    label: "Water/fire damage restoration"
+    include: true
+    overture_codes: [damage_restoration, fire_and_water_damage_restoration]
+  - slug: waterproofing
+    label: "Waterproofing"
+    include: false
+    overture_codes: [waterproofing]
+    reason: "Test later."
+  - slug: gutters_only
+    label: "Gutters only"
+    include: false
+    overture_codes: [gutter_service]
+    reason: "Low ticket, not urgent."
 
 pain_keywords:
   - 24/7
@@ -55,7 +68,10 @@ negative_keywords:
   - call center
 
 exclusions:
-  # SEED LIST, INCOMPLETE. Restoration is heavily franchised.
+  # SEED LISTS, INCOMPLETE. Matched on the normalized name (see ICP.md).
+  # chain_name_patterns: brand at the START of the name. Generic-sounding brands
+  # ("Gentle Dental", "Comfort Dental") are left to the website-domain rule,
+  # because many independents share those words.
   chain_name_patterns:
     - servpro
     - servicemaster
@@ -66,6 +82,7 @@ exclusions:
     - puroclean
     - rytech
     - first onsite
+  chain_name_contains: []
   keywords:
     - roofing supply
     - wholesale

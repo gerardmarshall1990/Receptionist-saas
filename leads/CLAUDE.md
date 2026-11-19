@@ -22,7 +22,8 @@ Read first: `docs/MASTER-SPEC.md` (the spec), `docs/ICP.md` (who we target), `do
 One stage at a time (spec §9): explore -> plan -> **wait for approval** -> implement with tests -> verify -> report
 (done / tested / untested / gaps / open questions) -> **wait for "verified"**. Commit after each green stage. Ask before adding scope.
 
-Current status: **Stage 0 done** (ICP config + skeleton). Next: Stage 1 universe pilot (needs approval).
+Current status: **Stage 1 done, awaiting "verified"** (US universe pilot: plumbing, HVAC, dental; 20k in Postgres).
+Reports: `docs/reports/taxonomy-<release>.md`, `docs/reports/stage1-pilot-<release>.md`. Next: lead-explorer UI plan.
 
 ## Commands
 
@@ -51,7 +52,19 @@ uv run mypy                      # strict
 uv run leads config validate     # validate all YAML, print categories, LLM cost projection, config hash
 uv run leads db check            # connect to LEADS_DATABASE_URL
 uv run leads db migrate          # apply pending migrations (idempotent)
+
+# Stage 1: T0 universe from Overture (open data, $0). Default categories = config pilot_sample.
+uv run leads universe plan       # what would be read/written (reads only cached file footers)
+uv run leads universe pilot --dry-run
+uv run leads universe pilot      # census -> extract -> build -> load -> report (each step idempotent)
+uv run leads universe census|extract|build|load|report [--categories plumbing,hvac] [--force]
 ```
+
+Stage 1 data flow (all under `data/`, gitignored):
+`raw/overture/<release>/manifest.json` (file bboxes) -> `census_*.parquet` -> `extract_US_<codes-hash>.parquet`
+-> `derived/stage1/<release>/built_US_<cats>_<config-hash>.parquet` (EVERY input row, with `exclusion` / `dup_of`)
+-> Postgres `businesses`/`phones`/`emails` (pilot sample only). A config change gives a new config hash, so a new
+built file; nothing stale is reused. A first census + extract reads ~2 min from Overture's public bucket.
 
 One-liner before every commit:
 `uv run ruff check . && uv run ruff format --check . && uv run mypy && uv run pytest`
@@ -59,7 +72,8 @@ One-liner before every commit:
 ## Layout
 
 ```
-config/global.yaml            countries, calling-hours guard rail, global exclusions, vendor names, watch list
+config/global.yaml            release pin, calling-hours guard rail, exclusions, vendor names, chain/dedupe
+                              thresholds, directory/platform domains, pilot sample sizes, watch list
 config/scoring.yaml           dimension weights, tiers, funnel fractions, signal weights
 config/models.yaml            LLM model names, effort, prices, token estimates (cost projection)
 config/categories/*.yaml      one file per category (file name == slug)
@@ -68,7 +82,10 @@ src/leads_engine/config_loader.py  strict pydantic validation of config/ + confi
 src/leads_engine/signals.py   the ONLY list of signal names; config/reasons/openers must use these
 src/leads_engine/log.py       structlog JSON logging; bind_run(run_id, stage) at job start
 src/leads_engine/db.py        Postgres connect + migration runner; DuckDB for Parquet
-src/leads_engine/cli.py       `leads` command
+src/leads_engine/cli.py       `leads` command (+ universe_commands.py)
+src/leads_engine/runs.py      every job records a `runs` row; hard budget stop
+src/leads_engine/universe/    overture.py (remote read), normalize.py (pure), build.py (exclude/chain/dedupe/
+                              sample), load.py (Postgres upsert), report.py, pipeline.py (paths + steps)
 migrations/NNN_*.sql          applied in order, each in a transaction, tracked in schema_migrations
 data/                         raw/derived bulk files (Parquet). Gitignored. Never commit data.
 ```
@@ -83,6 +100,10 @@ data/                         raw/derived bulk files (Parquet). Gitignored. Neve
 - **Safety defaults:** `LEADS_DRY_RUN=true` and `LEADS_RUN_BUDGET_USD=0` by default. A run spends money only when both are changed.
 - **Secrets** go in env vars only (never YAML, never git). Add them in the stage that first needs them.
 - **Migrations** are append-only: never edit an applied file; add a new numbered one.
+- **Chain rules:** `chain_name_patterns` match the START of the normalized name; `chain_name_contains` match anywhere.
+  Don't add generic-sounding brands ("Gentle Dental"): the website-domain rule catches real chain locations and the
+  name would also hit independents. Review the chain table in the Stage 1 report after any change.
+- **Overture release** is pinned in `global.yaml`. Bumping it requires `leads universe census` and re-confirming codes.
 - **Tests that need fixtures** (saved HTML etc.) go in `tests/fixtures/`. Never hit the network in tests.
 
 ## Never

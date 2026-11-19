@@ -11,19 +11,43 @@ why_converts:
   - "Front desks are overloaded with insurance, check-in and recalls."
 
 source_codes:
-  status: unconfirmed
-  overture: [dentist, general_dentistry, cosmetic_dentist, pediatric_dentist, orthodontist, endodontist, periodontist, oral_surgeon, emergency_dentist]
+  status: confirmed
+  overture_release: "2026-11-18.0"
   osm: ["amenity=dentist", "healthcare=dentist"]
-  note: "Verify Overture codes in Stage 1."
+  note: "Codes confirmed in docs/reports/taxonomy-2026-11-18.0.md."
 
 subcategories:
-  - {slug: general_dentistry, label: General dentistry, include: true}
-  - {slug: cosmetic_dentistry, label: Cosmetic dentistry, include: true}
-  - {slug: pediatric_dentistry, label: Pediatric dentistry, include: true}
-  - {slug: orthodontics, label: Orthodontics, include: true}
-  - {slug: specialists, label: Endo/perio/oral surgery, include: true, reason: "Referral-driven; test separately."}
-  - {slug: dental_lab, label: Dental lab, include: false, reason: "No patient calls."}
-  - {slug: dso_owned, label: DSO-owned practice, include: false, reason: "Chain; decisions made centrally."}
+  - slug: general_dentistry
+    label: "General dentistry"
+    include: true
+    overture_codes: [dental_clinic, general_dentistry]
+  - slug: cosmetic_dentistry
+    label: "Cosmetic dentistry"
+    include: true
+    overture_codes: [cosmetic_dentistry]
+  - slug: pediatric_dentistry
+    label: "Pediatric dentistry"
+    include: true
+    overture_codes: [pediatric_dentistry]
+  - slug: orthodontics
+    label: "Orthodontics"
+    include: true
+    overture_codes: [orthodontics]
+  - slug: specialists
+    label: "Endo/perio/prostho/oral surgery"
+    include: true
+    overture_codes: [endodontics, periodontics, prosthodontics, oral_and_maxillofacial_surgery]
+    reason: "Referral-driven; report separately."
+  - slug: dental_lab
+    label: "Dental lab"
+    include: false
+    overture_codes: [b2b_dental_lab]
+    reason: "No patient calls."
+  - slug: dental_supply
+    label: "Dental supply store"
+    include: false
+    overture_codes: [dental_supply_store]
+    reason: "Shop."
 
 pain_keywords:
   - new patients welcome
@@ -55,34 +79,40 @@ negative_keywords:
   - our call center
 
 exclusions:
-  # SEED LIST, INCOMPLETE. DSOs often keep the original practice name, so the
-  # name list only catches branded ones; Stage 2 should also look for DSO
-  # footers ("a member of ...", "supported by ...").
+  # SEED LISTS, INCOMPLETE. Matched on the normalized name (see ICP.md).
+  # chain_name_patterns: brand at the START of the name. Generic-sounding brands
+  # ("Gentle Dental", "Comfort Dental") are left to the website-domain rule,
+  # because many independents share those words.
   chain_name_patterns:
     - aspen dental
     - heartland dental
     - pacific dental services
     - western dental
-    - coast dental
-    - gentle dental
-    - comfort dental
-    - castle dental
-    - monarch dental
-    - bright now! dental
+    - great expressions
+    - "bright now! dental"
     - brightnow dental
     - kool smiles
-    - great expressions
-    - ideal dental
     - smile brands
     - perfect teeth
     - risas dental
-    - midwest dental
+    - smile direct club
+    - smiledirectclub
+    - my kids dentist
+    - dental dreams
+    - affordable dentures
+  chain_name_contains: []
   keywords:
     - dental lab
     - dental laboratory
     - dental supply
     - school of dentistry
     - dental school
+    - college of dentistry
+    - university of
+    - faculty practice
+    - hospital
+    - health system
+    - community health center
   note: ""
 
 staff_target: {min: 3, typical: 8, max: 20, hard_max: 40}

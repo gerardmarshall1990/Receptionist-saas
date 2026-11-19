@@ -1,17 +1,12 @@
 from __future__ import annotations
 
-import os
-import uuid
-from collections.abc import Iterator
 from pathlib import Path
 
 import psycopg
 import pytest
 
 from leads_engine import db
-
-TEST_URL = os.environ.get("TEST_DATABASE_URL")
-needs_db = pytest.mark.skipif(not TEST_URL, reason="TEST_DATABASE_URL not set")
+from tests.conftest import needs_db
 
 
 def test_migration_files_are_numbered_and_unique() -> None:
@@ -33,25 +28,10 @@ def test_duckdb_reads_parquet_in_place(tmp_path: Path) -> None:
     )
 
 
-@pytest.fixture
-def fresh_db() -> Iterator[str]:
-    """A throwaway database per test, dropped afterwards."""
-    assert TEST_URL
-    name = f"leads_t_{uuid.uuid4().hex[:10]}"
-    with psycopg.connect(TEST_URL, autocommit=True) as admin:
-        admin.execute(f'create database "{name}"')
-    base, _, _ = TEST_URL.rpartition("/")
-    try:
-        yield f"{base}/{name}"
-    finally:
-        with psycopg.connect(TEST_URL, autocommit=True) as admin:
-            admin.execute(f'drop database if exists "{name}" with (force)')
-
-
 @pytest.mark.db
 @needs_db
 def test_migrate_is_idempotent(fresh_db: str) -> None:
-    assert db.migrate(fresh_db) == ["001_init.sql"]
+    assert db.migrate(fresh_db) == [f.name for f in db.migration_files()]
     assert db.migrate(fresh_db) == []
     with psycopg.connect(fresh_db) as conn:
         tables = {
@@ -60,7 +40,7 @@ def test_migrate_is_idempotent(fresh_db: str) -> None:
                 "select table_name from information_schema.tables where table_schema='public'"
             )
         }
-    assert {"runs", "suppression", "schema_migrations"} <= tables
+    assert {"runs", "suppression", "schema_migrations", "businesses", "phones", "emails"} <= tables
 
 
 @pytest.mark.db

@@ -63,13 +63,54 @@ class CallingHoursBounds(Strict):
         return self
 
 
+class ChainDetection(Strict):
+    # Overture brand.wikidata set -> known brand -> chain.
+    use_brand_wikidata: bool
+    # Same website domain at this many distinct locations (ZIPs) -> chain.
+    chain_min_locations: Annotated[int, Field(ge=3)]
+    # 2 .. chain_min_locations-1 locations -> multiple_locations signal, kept.
+    multi_location_min: Annotated[int, Field(ge=2)]
+    # A phone shared by more records than this is never used to merge, and is flagged.
+    shared_phone_max: Annotated[int, Field(ge=1)]
+    # Same normalized name in at least this many locations -> chain if most of those
+    # listings share one website (share below), else flagged for review only.
+    name_repeat_review_cities: Annotated[int, Field(ge=3)]
+    name_network_min_domain_share: Annotated[float, Field(gt=0, le=1)]
+
+    @model_validator(mode="after")
+    def _order(self) -> Self:
+        if self.multi_location_min >= self.chain_min_locations:
+            raise ValueError("multi_location_min must be below chain_min_locations")
+        return self
+
+
+class Normalization(Strict):
+    # Website on one of these = not the business's own site (treated as no website).
+    non_business_site_domains: list[Keyword]
+    # Website builders where the business site is a subdomain: domain key = full host.
+    hosted_site_domains: list[Keyword]
+    # Personal-mail providers: an address here is flagged, never exported without site proof.
+    freemail_domains: list[Keyword]
+    role_email_prefixes: list[Keyword]
+
+    @field_validator("*")
+    @classmethod
+    def _lower(cls, v: list[str]) -> list[str]:
+        return _unique_lower(v, "normalization list")
+
+
 class GlobalConfig(Strict):
     version: int
     countries_enabled: list[Literal["US", "CA", "AU", "GB"]]
     universe_target: Annotated[int, Field(gt=0)]
+    # Pinned for reproducibility; bump deliberately and re-run the census.
+    overture_release: Annotated[str, StringConstraints(pattern=r"^\d{4}-\d{2}-\d{2}\.\d+$")]
     calling_hours_hard_bounds: CallingHoursBounds
     global_exclusion_keywords: list[Keyword]
     answering_vendor_patterns: list[Keyword]
+    chain_detection: ChainDetection
+    normalization: Normalization
+    pilot_sample: dict[Slug, Annotated[int, Field(gt=0)]]
     watch_list: list[Slug]
     open_questions: list[str] = []
 
@@ -198,8 +239,10 @@ class ModelsConfig(Strict):
 
 
 class SourceCodes(Strict):
+    # "confirmed" = every subcategory code was seen in the named Overture
+    # release's US taxonomy census (docs/reports/taxonomy-<release>.md).
     status: Literal["confirmed", "unconfirmed"]
-    overture: list[str]
+    overture_release: str
     osm: list[str]
     note: str = ""
 
@@ -216,17 +259,28 @@ class Subcategory(Strict):
     slug: Slug
     label: str
     include: bool
+    # Overture taxonomy.primary codes that map to this subcategory.
+    overture_codes: list[Slug]
     reason: str = ""
+
+    @model_validator(mode="after")
+    def _has_codes(self) -> Self:
+        if not self.overture_codes:
+            raise ValueError(f"subcategory {self.slug!r} needs at least one overture code")
+        return self
 
 
 class Exclusions(Strict):
-    # Case-insensitive substrings matched against the business name. Seed lists
-    # only: incomplete by design and flagged as such in each file.
+    # Brand names matched at the START of the normalized business name
+    # ("Aspen Dental - X" yes, "Twin Aspen Dental" no). Seed lists, incomplete.
     chain_name_patterns: list[Keyword]
+    # Brands that appear mid-name ("Barlow Service Experts"). Matched anywhere.
+    chain_name_contains: list[Keyword] = []
+    # Matched anywhere in the name (supply houses, labs, schools...).
     keywords: list[Keyword]
     note: str = ""
 
-    @field_validator("chain_name_patterns", "keywords")
+    @field_validator("chain_name_patterns", "chain_name_contains", "keywords")
     @classmethod
     def _lower(cls, v: list[str]) -> list[str]:
         return _unique_lower(v, "exclusion entries")
@@ -323,8 +377,23 @@ class CategoryConfig(Strict):
             raise ValueError("keyword list must not be empty")
         return _unique_lower(v, "keywords")
 
+    @property
+    def included_codes(self) -> dict[str, str]:
+        """Overture code -> subcategory slug, for included subcategories only."""
+        return {c: s.slug for s in self.subcategories if s.include for c in s.overture_codes}
+
+    @property
+    def excluded_codes(self) -> dict[str, str]:
+        return {c: s.slug for s in self.subcategories if not s.include for c in s.overture_codes}
+
     @model_validator(mode="after")
     def _cross_checks(self) -> Self:
+        codes = [c for s in self.subcategories for c in s.overture_codes]
+        dupes = sorted({c for c in codes if codes.count(c) > 1})
+        if dupes:
+            raise ValueError(f"overture codes in more than one subcategory: {dupes}")
+        if not self.included_codes:
+            raise ValueError("at least one included subcategory is required")
         if not self.best_call_windows:
             raise ValueError("at least one best_call_window is required")
         if not self.opener_templates:
@@ -364,7 +433,36 @@ class AppConfig(Strict):
         overlap = set(self.categories) & set(self.global_.watch_list)
         if overlap:
             raise ValueError(f"category both active and on watch list: {sorted(overlap)}")
+        stale = sorted(
+            c.slug
+            for c in self.categories.values()
+            if c.source_codes.status == "confirmed"
+            and c.source_codes.overture_release != self.global_.overture_release
+        )
+        if stale:
+            raise ValueError(
+                f"codes confirmed against another Overture release (re-run census): {stale}"
+            )
+        unknown = sorted(set(self.global_.pilot_sample) - set(self.categories))
+        if unknown:
+            raise ValueError(f"pilot_sample names unknown categories: {unknown}")
+        seen: dict[str, str] = {}
+        for cat in self.categories.values():
+            for code in [*cat.included_codes, *cat.excluded_codes]:
+                if code in seen:
+                    raise ValueError(f"overture code {code!r} in both {seen[code]} and {cat.slug}")
+                seen[code] = cat.slug
         return self
+
+    def code_map(self, slugs: list[str]) -> dict[str, tuple[str, str]]:
+        """Included Overture code -> (category, subcategory) for the given categories."""
+        out: dict[str, tuple[str, str]] = {}
+        for slug in slugs:
+            if slug not in self.categories:
+                raise KeyError(f"unknown category {slug!r}")
+            for code, sub in self.categories[slug].included_codes.items():
+                out[code] = (slug, sub)
+        return out
 
     def pilot_categories(self, phase: str) -> list[CategoryConfig]:
         return sorted(

@@ -11,16 +11,26 @@ why_converts:
   - "Installs and replacements are high-ticket ($5k-$15k+), so one saved lead covers months."
 
 source_codes:
-  status: unconfirmed
-  overture: [hvac_services, heating_and_air_conditioning, air_duct_cleaning_service]
+  status: confirmed
+  overture_release: "2026-11-18.0"
   osm: ["craft=hvac"]
-  note: "Overture codes from memory; verify in Stage 1. OSM craft=hvac is sparse in the US."
+  note: "OSM craft=hvac is sparse in the US."
 
 subcategories:
-  - {slug: residential_hvac, label: Residential HVAC, include: true}
-  - {slug: commercial_hvac, label: Commercial HVAC, include: true, reason: "Include, but larger firms often have dispatch; staff caps apply."}
-  - {slug: duct_cleaning, label: Duct cleaning only, include: false, reason: "Lower ticket, not urgent; revisit with data."}
-  - {slug: hvac_supply, label: HVAC supply/distributor, include: false, reason: "Shop/distributor, not a service business."}
+  - slug: hvac_service
+    label: "HVAC service"
+    include: true
+    overture_codes: [hvac_service]
+  - slug: duct_cleaning
+    label: "Duct cleaning only"
+    include: false
+    overture_codes: [air_duct_cleaning_service]
+    reason: "Lower ticket, not urgent; revisit with data."
+  - slug: hvac_supply
+    label: "HVAC supplier/distributor"
+    include: false
+    overture_codes: [hvac_supplier]
+    reason: "Distributor, not a service business."
 
 pain_keywords:
   - 24/7
@@ -53,15 +63,34 @@ negative_keywords:
   - our dispatchers answer 24/7
 
 exclusions:
-  # SEED LIST, INCOMPLETE.
+  # SEED LISTS, INCOMPLETE. Matched on the normalized name (see ICP.md).
+  # chain_name_patterns: brand at the START of the name. Generic-sounding brands
+  # ("Gentle Dental", "Comfort Dental") are left to the website-domain rule,
+  # because many independents share those words.
   chain_name_patterns:
-    - one hour heating & air
+    - "one hour heating & air"
     - one hour heating and air
     - aire serv
+  chain_name_contains:
     - service experts
     - ars rescue rooter
     - home depot
     - sears home services
+    - goodman distribution
+    - goodman manufacturing
+    - trane commercial
+    - trane supply
+    - trane technologies
+    - carrier enterprise
+    - johnstone supply
+    - gemaire
+    - watsco
+    - lennox stores
+    - lennox pros
+    - united refrigeration
+    - baker distributing
+    - ferguson hvac
+    - ferguson enterprises
   keywords:
     - hvac supply
     - supply house

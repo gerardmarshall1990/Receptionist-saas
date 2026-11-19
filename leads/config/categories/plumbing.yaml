@@ -13,16 +13,24 @@ why_converts:
   - "One emergency job (~$300-$1,500+) covers the $389/mo price."
 
 source_codes:
-  status: unconfirmed
-  overture: [plumbing, water_heater_installation_repair, sewer_services]
+  status: confirmed
+  overture_release: "2026-11-18.0"
   osm: ["craft=plumber"]
-  note: "Overture codes written from memory of the taxonomy; Stage 1 must check them against the release's category list before querying."
+  note: "Codes confirmed in docs/reports/taxonomy-2026-11-18.0.md."
 
 subcategories:
-  - {slug: residential_plumbing, label: Residential plumbing, include: true}
-  - {slug: drain_sewer, label: Drain and sewer, include: true}
-  - {slug: water_heater, label: Water heater install/repair, include: true}
-  - {slug: plumbing_supply, label: Plumbing supply store, include: false, reason: "Shop, not a service business (spec excludes shops)."}
+  - slug: plumbing
+    label: "Plumbing"
+    include: true
+    overture_codes: [plumbing]
+  - slug: backflow
+    label: "Backflow testing/repair"
+    include: true
+    overture_codes: [backflow_service]
+  - slug: water_heater
+    label: "Water heater install/repair"
+    include: true
+    overture_codes: [water_heater_installation_repair]
 
 # Website text that suggests calls are missed or phone-dependent.
 pain_keywords:
@@ -60,19 +68,26 @@ negative_keywords:
   - our dispatchers answer 24/7
 
 exclusions:
-  # SEED LIST, INCOMPLETE. Matched case-insensitively on whole words against the
-  # business name. Franchise brands of independently owned units are still
-  # excluded (spec: exclude chains/franchises).
+  # SEED LISTS, INCOMPLETE. Matched on the normalized name (see ICP.md).
+  # chain_name_patterns: brand at the START of the name. Generic-sounding brands
+  # ("Gentle Dental", "Comfort Dental") are left to the website-domain rule,
+  # because many independents share those words.
   chain_name_patterns:
     - roto-rooter
     - mr. rooter
-    - mr rooter
     - benjamin franklin plumbing
+    - zoom drain
+    - 1-tom-plumber
+  chain_name_contains:
     - ars rescue rooter
     - rescue rooter
-    - one hour heating & air
     - home depot
-    - lowe's
+    - sears home services
+    - ferguson plumbing supply
+    - ferguson bath
+    - ferguson enterprises
+    - ferguson waterworks
+    - "one hour heating & air"
   keywords:
     - plumbing supply
     - supply house

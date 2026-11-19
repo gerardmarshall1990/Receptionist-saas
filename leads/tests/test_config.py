@@ -42,6 +42,7 @@ def test_every_category_has_the_required_stage0_fields() -> None:
         assert len(cat.pain_keywords) >= 5, cat.slug
         assert cat.review_pain_keywords, cat.slug
         assert cat.exclusions.chain_name_patterns, cat.slug
+        assert cat.included_codes, cat.slug
         assert cat.best_call_windows, cat.slug
         assert cat.opener_templates, cat.slug
         assert cat.staff_target.max <= 20, f"{cat.slug}: spec fit is staff 1-20"
@@ -223,6 +224,24 @@ def test_invalid_config_fails_loudly(
     mutate(rel, edit)
     with pytest.raises(ValueError, match=match):  # pydantic ValidationError is a ValueError
         load_config(config_copy)
+
+
+def test_code_map_covers_included_codes_only() -> None:
+    cfg = load_config(REAL_CONFIG)
+    m = cfg.code_map(["plumbing", "dental"])
+    assert m["plumbing"] == ("plumbing", "plumbing")
+    assert m["orthodontics"] == ("dental", "orthodontics")
+    assert "b2b_dental_lab" not in m  # excluded subcategory
+    assert "hvac_service" not in m  # category not requested
+    with pytest.raises(KeyError):
+        cfg.code_map(["vets"])
+
+
+def test_all_categories_confirmed_against_the_pinned_release() -> None:
+    cfg = load_config(REAL_CONFIG)
+    for c in cfg.categories.values():
+        assert c.source_codes.status == "confirmed", c.slug
+        assert c.source_codes.overture_release == cfg.global_.overture_release
 
 
 def test_missing_file_fails(config_copy: Path) -> None:

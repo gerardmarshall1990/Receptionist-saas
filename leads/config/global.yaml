@@ -6,6 +6,9 @@ version: 1
 countries_enabled: [US]
 # Universe size the cost projections assume (spec: ~3M across US/CA/AU/UK).
 universe_target: 3000000
+# Overture Maps release used for T0. Bumping it requires re-running
+# `leads universe census` and re-confirming category codes.
+overture_release: "2026-11-18.0"
 
 # No category may schedule calls outside these local-time bounds (the
 # business's own timezone). Federal TCPA allows 8am-9pm; several state
@@ -31,6 +34,12 @@ global_exclusion_keywords:
   - travel agency
   - nationwide locations
   - "locations nationwide"
+  # Government bodies (their .gov sites are not used as exclusions, see normalize.py)
+  - veterans affairs
+  - va medical center
+  - va clinic
+  - department of
+  - health department
 
 # Answering-service / AI-receptionist vendor names. A mention on the business's
 # own site means the need is already solved -> exclude (spec section 4).
@@ -46,6 +55,141 @@ answering_vendor_patterns:
   - dialzara
   - goodcall
   - my ai front desk
+
+# Chain detection and dedupe thresholds (Stage 1). Starting values; tune from
+# the Stage 1 report's "top repeated names / domains" tables.
+chain_detection:
+  use_brand_wikidata: true
+  chain_min_locations: 10
+  multi_location_min: 2
+  shared_phone_max: 3
+  name_repeat_review_cities: 10
+  # ...and at least this share of those listings point at one website.
+  name_network_min_domain_share: 0.5
+
+normalization:
+  # A "website" on these is a directory/social page, not the business's site.
+  non_business_site_domains:
+    - facebook.com
+    - instagram.com
+    - twitter.com
+    - x.com
+    - linkedin.com
+    - youtube.com
+    - tiktok.com
+    - yelp.com
+    - google.com
+    - goo.gl
+    - g.page
+    - business.site
+    - hub.biz
+    - nextdoor.com
+    - angi.com
+    - angieslist.com
+    - homeadvisor.com
+    - thumbtack.com
+    - houzz.com
+    - bbb.org
+    - yellowpages.com
+    - mapquest.com
+    - manta.com
+    - healthgrades.com
+    - zocdoc.com
+    - avvo.com
+    - justia.com
+    - findlaw.com
+    - lawyers.com
+    - linktr.ee
+    # Booking/marketing/financing platforms and listing networks: the "website" is
+    # a profile page on someone else's domain (found in the Stage 1 chain review).
+    - demandforce.com
+    - flexbook.me
+    - calendly.com
+    - carestack.com
+    - patientrewardshub.com
+    - mysynchrony.com
+    - carecredit.com
+    - yodle.com
+    - pr.business
+    - publicreputation.com
+    - dps-siteplatform.com
+    - wellness.com
+    - plumbersnearyou.com
+    - dentalassociatesnearme.com
+    - emergencydentalservice.com
+    - localsearch.com
+    - placeweb.site
+    - us.com
+    # HVAC manufacturers: independent dealers often list a dealer page here.
+    - trane.com
+    - tranetechnologies.com
+    - americanstandardair.com
+    - lennox.com
+    - carrier.com
+    - goodmanmfg.com
+    - rheem.com
+    - ruud.com
+    - bryant.com
+    - daikincomfort.com
+    - yorkupg.com
+    # Plumbing/fixture manufacturers (dealer and "find a pro" pages).
+    - kohler.com
+    - moen.com
+    - bradfordwhite.com
+    - aosmith.com
+    - generac.com
+  # Website builders where each business is a subdomain (domain key = full host).
+  hosted_site_domains:
+    - wixsite.com
+    - squarespace.com
+    - weebly.com
+    - godaddysites.com
+    - wordpress.com
+    - blogspot.com
+    - square.site
+    - webflow.io
+    - carrd.co
+  freemail_domains:
+    - gmail.com
+    - yahoo.com
+    - hotmail.com
+    - outlook.com
+    - aol.com
+    - icloud.com
+    - me.com
+    - msn.com
+    - live.com
+    - comcast.net
+    - att.net
+    - sbcglobal.net
+    - verizon.net
+    - bellsouth.net
+    - cox.net
+    - charter.net
+    - protonmail.com
+    - ymail.com
+  role_email_prefixes:
+    - info
+    - office
+    - contact
+    - admin
+    - sales
+    - service
+    - support
+    - hello
+    - frontdesk
+    - reception
+    - appointments
+    - billing
+    - team
+    - mail
+
+# Stage 1 pilot: rows per category loaded into Postgres (stratified random,
+# whole US). The full extract stays in Parquet.
+pilot_sample:
+  plumbing: 8000
+  hvac: 6000
+  dental: 6000
 
 # Categories to test later; not configured yet (spec section 1).
 watch_list:

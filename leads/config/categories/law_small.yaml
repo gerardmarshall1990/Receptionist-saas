@@ -11,18 +11,49 @@ why_converts:
   - "Many urgent calls come evenings and weekends."
 
 source_codes:
-  status: unconfirmed
-  overture: [lawyer, personal_injury_law, family_practice_law, divorce_and_family_law, criminal_defense_law, dui_law]
+  status: confirmed
+  overture_release: "2026-11-18.0"
   osm: ["office=lawyer"]
-  note: "OSM office=lawyer rarely carries practice area; classify practice area from the website in Stage 2."
+  note: "113k US firms carry only the generic attorney code; their practice area is classified from the website in Stage 2."
 
 subcategories:
-  - {slug: personal_injury, label: Personal injury, include: true}
-  - {slug: family_law, label: Family/divorce, include: true}
-  - {slug: criminal_defense, label: Criminal defense / DUI, include: true}
-  - {slug: immigration, label: Immigration, include: false, reason: "Not in spec; OPEN QUESTION."}
-  - {slug: estate_planning, label: Estate planning, include: false, reason: "Not in spec; less urgent. OPEN QUESTION."}
-  - {slug: corporate, label: Corporate/large firm, include: false, reason: "Not a small-business buyer."}
+  - slug: personal_injury
+    label: "Personal injury"
+    include: true
+    overture_codes: [personal_injury_law]
+  - slug: family_law
+    label: "Family/divorce"
+    include: true
+    overture_codes: [divorce_and_family_law]
+  - slug: criminal_defense
+    label: "Criminal defense / DUI"
+    include: true
+    overture_codes: [criminal_defense_law, dui_law]
+  - slug: practice_unknown
+    label: "Law firm, practice area not coded"
+    include: true
+    overture_codes: [attorney_or_law_firm]
+    reason: "Kept until the website shows the practice area; non-target areas are dropped in Stage 2."
+  - slug: immigration
+    label: "Immigration"
+    include: false
+    overture_codes: [immigration_law]
+    reason: "Not in spec; OPEN QUESTION."
+  - slug: estate_planning
+    label: "Estate/wills/probate"
+    include: false
+    overture_codes: [wills_trusts_and_probate, estate_planning_law]
+    reason: "Not in spec; OPEN QUESTION."
+  - slug: other_practice
+    label: "Other practice areas"
+    include: false
+    overture_codes: [bankruptcy_law, employment_law, business_law, real_estate_law, general_litigation, tax_law, medical_law, disability_law, social_security_law, ip_and_internet_law, patent_law, workers_compensation_law, contract_law, tenant_and_eviction_law, civil_rights_lawyer]
+    reason: "Not in spec."
+  - slug: not_a_law_firm
+    label: "Legal-adjacent services"
+    include: false
+    overture_codes: [legal_service, notary_public, bail_bonds_service, private_investigation, paralegal_service, process_server, court_reporter, mediator]
+    reason: "Not attorneys, or too generic to tell."
 
 pain_keywords:
   - free consultation
@@ -53,14 +84,18 @@ negative_keywords:
   - legal intake center
 
 exclusions:
-  # SEED LIST, INCOMPLETE. Big advertising PI firms and legal-services platforms.
+  # SEED LISTS, INCOMPLETE. Matched on the normalized name (see ICP.md).
+  # chain_name_patterns: brand at the START of the name. Generic-sounding brands
+  # ("Gentle Dental", "Comfort Dental") are left to the website-domain rule,
+  # because many independents share those words.
   chain_name_patterns:
-    - morgan & morgan
+    - "morgan & morgan"
     - morgan and morgan
-    - jacoby & meyers
+    - "jacoby & meyers"
     - legalzoom
     - rocket lawyer
     - legalshield
+  chain_name_contains: []
   keywords:
     - legal aid
     - public defender

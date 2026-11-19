@@ -2,6 +2,30 @@
 
 Newest first. One entry per decision that someone might later ask "why?" about.
 
+## 2026-11-19 — Stage 1 (universe pilot)
+
+- **Source:** Overture Maps Places, release `2026-11-18.0` (pinned in `global.yaml`), read straight from the public
+  bucket over HTTPS: only the needed columns, and only the 7 of 16 files overlapping the US. No bulk download.
+- **OpenStreetMap deferred to Stage 3** (approved): a US extract is ~10 GB and in the pilot it would only add a
+  second phone source.
+- **Sample:** stratified random across the whole US (plumbing 8k, HVAC 6k, dental 6k), deterministic seed `stage1-v1`.
+  The full extract stays in Parquet; only the sample goes to Postgres.
+- **Primary code only.** Places are matched on `taxonomy.primary`, not `alternates`. The census report shows the
+  alternates ceiling; for the pilot codes it's small.
+- **Locations, not cities.** Chains and multi-location businesses are counted by distinct ZIPs. Counting cities missed
+  chains concentrated in one metro (Absolute Dental, ~40 sites in Las Vegas).
+- **Dedupe keys:** same phone (unless > 3 listings share it), same website + ZIP, same name + ZIP (not for generic
+  names). An earlier "same website + city" key merged separate locations of one chain into one record; replaced.
+- **Phone agreement starts at 1.** Overture records provenance per record, not per field, so the cross-check
+  (`agree_count`) gets real values in Stage 2/3 (website, lookup). The record's contributing datasets are stored as
+  `source_datasets`.
+- **Emails from Overture are `source_listed`**, never exportable as-is. Only `business_site` emails (found on the
+  business's own site in Stage 2) can be.
+- **`.gov` "websites" are dropped, not excluded.** Plumbers often list their state license page; excluding them
+  threw away real businesses.
+- **Chain patterns match the start of the name.** Matching anywhere excluded "Twin Aspen Dental", "New Castle Dental",
+  "Tim Ferguson Plumbing". Generic-sounding brands are left to the domain rule.
+
 ## 2026-11-19 — Stage 0
 
 - **Location.** The engine lives in `leads/` inside the `Receptionist-saas` repo, not a separate `frontdesk-leads`

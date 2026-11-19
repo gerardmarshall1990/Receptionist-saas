@@ -1,22 +1,22 @@
 """Command line entry point: ``leads <group> <command>``.
 
-Stage 0 ships only commands that read config or touch the local database.
-Nothing here crawls, downloads, or calls a paid API.
+Groups: config, db, universe (Stage 1). Nothing here crawls websites or
+calls a paid API; `universe` reads open Overture data.
 """
 
 from __future__ import annotations
 
 import argparse
 import sys
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 
-from leads_engine import db
+from leads_engine import db, universe_commands
 from leads_engine.config_loader import AppConfig, load_config, resolve_model
 from leads_engine.log import configure_logging, get_logger
 from leads_engine.settings import get_settings
 
 
-def _config_validate() -> int:
+def _config_validate(args: argparse.Namespace) -> int:
     s = get_settings()
     cfg = load_config(s.config_dir)
     log = get_logger("cli")
@@ -61,22 +61,23 @@ def cost_projection_lines(cfg: AppConfig) -> list[str]:
     ]
 
 
-def _db_check() -> int:
+def _db_check(args: argparse.Namespace) -> int:
     print(db.check(get_settings().database_url))
     return 0
 
 
-def _db_migrate() -> int:
+def _db_migrate(args: argparse.Namespace) -> int:
     applied = db.migrate(get_settings().database_url)
     get_logger("cli").info("migrations_applied", applied=applied)
     print("applied: " + (", ".join(applied) if applied else "nothing (up to date)"))
     return 0
 
 
-COMMANDS = {
+COMMANDS: dict[tuple[str, str], Callable[[argparse.Namespace], int]] = {
     ("config", "validate"): _config_validate,
     ("db", "check"): _db_check,
     ("db", "migrate"): _db_migrate,
+    **universe_commands.COMMANDS,
 }
 
 
@@ -88,6 +89,7 @@ def build_parser() -> argparse.ArgumentParser:
     dbp = groups.add_parser("db").add_subparsers(dest="command", required=True)
     dbp.add_parser("check", help="connect to LEADS_DATABASE_URL")
     dbp.add_parser("migrate", help="apply pending migrations")
+    universe_commands.add_parser(groups)
     return p
 
 
@@ -96,7 +98,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     s = get_settings()
     configure_logging(s.log_level, s.log_format)
     try:
-        return COMMANDS[(args.group, args.command)]()
+        return COMMANDS[(args.group, args.command)](args)
     except Exception as exc:
         get_logger("cli").error("command_failed", error=str(exc))
         print(f"error: {exc}", file=sys.stderr)

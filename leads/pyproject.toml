@@ -4,12 +4,16 @@ version = "0.1.0"
 description = "Frontdesk leads engine: builds a verified, scored, compliant database of small businesses likely to buy an AI receptionist."
 requires-python = ">=3.12,<3.13"
 dependencies = [
-    "duckdb>=1.1",
+    "duckdb>=2.0",
+    "phonenumbers>=9.0.43",
     "psycopg[binary]>=3.2",
+    "pyarrow>=26.0.1",
     "pydantic>=2.9",
     "pydantic-settings>=2.6",
     "pyyaml>=6.0",
     "structlog>=24.4",
+    "timezonefinder>=9.2.0",
+    "tldextract>=5.4.0",
 ]
 
 [project.scripts]
@@ -40,7 +44,10 @@ select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF", "S", "PT"]
 ignore = []
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101", "S105", "S106"]
+# Tests hold data tables and build SQL from tmp paths they created themselves.
+"tests/**" = ["S101", "S105", "S106", "S608", "E501"]
+# Markdown report: long literal table/prose strings.
+"src/leads_engine/universe/report.py" = ["E501"]
 
 [tool.mypy]
 python_version = "3.12"
@@ -49,7 +56,7 @@ files = ["src", "tests"]
 mypy_path = "src"
 
 [[tool.mypy.overrides]]
-module = ["duckdb.*"]
+module = ["duckdb.*", "pyarrow.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

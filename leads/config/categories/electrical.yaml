@@ -11,16 +11,21 @@ why_converts:
   - "Panel upgrades, EV chargers and rewires are mid-to-high ticket."
 
 source_codes:
-  status: unconfirmed
-  overture: [electrician, electrical_contractor]
+  status: confirmed
+  overture_release: "2026-11-18.0"
   osm: ["craft=electrician"]
-  note: "Verify Overture codes in Stage 1."
+  note: "Codes confirmed in docs/reports/taxonomy-2026-11-18.0.md."
 
 subcategories:
-  - {slug: residential_electrical, label: Residential electrician, include: true}
-  - {slug: commercial_electrical, label: Commercial electrician, include: true}
-  - {slug: electrical_supply, label: Electrical supply store, include: false, reason: "Shop."}
-  - {slug: low_voltage_only, label: Low-voltage/AV only, include: false, reason: "Different buyer; revisit later."}
+  - slug: electrician
+    label: "Electrician"
+    include: true
+    overture_codes: [electrician]
+  - slug: electrical_supply
+    label: "Electrical supply/wholesale"
+    include: false
+    overture_codes: [electrical_supply_store, electrical_wholesaler]
+    reason: "Shop/wholesaler."
 
 pain_keywords:
   - 24/7
@@ -48,11 +53,14 @@ negative_keywords:
   - live dispatcher 24/7
 
 exclusions:
-  # SEED LIST, INCOMPLETE.
+  # SEED LISTS, INCOMPLETE. Matched on the normalized name (see ICP.md).
+  # chain_name_patterns: brand at the START of the name. Generic-sounding brands
+  # ("Gentle Dental", "Comfort Dental") are left to the website-domain rule,
+  # because many independents share those words.
   chain_name_patterns:
     - mister sparky
     - mr. electric
-    - mr electric
+  chain_name_contains:
     - home depot
   keywords:
     - electrical supply

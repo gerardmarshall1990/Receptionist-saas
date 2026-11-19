@@ -11,18 +11,69 @@ why_converts:
   - "Body/collision jobs are high ticket and often insurance-paid."
 
 source_codes:
-  status: unconfirmed
-  overture: [automotive_repair, auto_body_shop, auto_glass_service, transmission_repair, brake_service_and_repair]
+  status: confirmed
+  overture_release: "2026-11-18.0"
   osm: ["shop=car_repair"]
-  note: "OSM body shops are shop=car_repair + service:vehicle:body_repair=yes. Verify Overture codes in Stage 1."
+  note: "OSM body shops are shop=car_repair + service:vehicle:body_repair=yes."
 
 subcategories:
-  - {slug: general_repair, label: General auto repair, include: true}
-  - {slug: body_collision, label: Body/collision, include: true}
-  - {slug: transmission, label: Transmission, include: true}
-  - {slug: quick_lube, label: Oil change / quick lube, include: false, reason: "Walk-in, low ticket, chain-dominated."}
-  - {slug: dealership_service, label: Dealership service department, include: false, reason: "Large employer with call centers."}
-  - {slug: auto_parts, label: Auto parts store, include: false, reason: "Shop."}
+  - slug: general_repair
+    label: "General auto repair"
+    include: true
+    overture_codes: [automotive_repair, engine_repair_service, auto_electrical_repair, brake_service_and_repair]
+  - slug: body_collision
+    label: "Body/collision"
+    include: true
+    overture_codes: [auto_body_shop]
+  - slug: transmission
+    label: "Transmission"
+    include: true
+    overture_codes: [transmission_repair]
+  - slug: tire_and_repair
+    label: "Tire dealer and repair"
+    include: true
+    overture_codes: [tire_dealer_and_repair]
+    reason: "Many independents are 'Auto & Tire'; chains removed by chain rules."
+  - slug: truck_repair
+    label: "Truck repair"
+    include: false
+    overture_codes: [truck_repair]
+    reason: "Fleet/commercial; test later."
+  - slug: auto_glass
+    label: "Auto glass"
+    include: false
+    overture_codes: [auto_glass_service, windshield_installation_and_repair, car_window_tinting]
+    reason: "Chain-dominated; test later."
+  - slug: generic_auto_service
+    label: "Generic automotive service"
+    include: false
+    overture_codes: [automotive_service]
+    reason: "Too generic to tell; revisit."
+  - slug: quick_lube
+    label: "Oil change / quick lube"
+    include: false
+    overture_codes: [oil_change_station]
+    reason: "Walk-in, low ticket, chain-dominated."
+  - slug: tire_shop
+    label: "Tire shop"
+    include: false
+    overture_codes: [tire_shop]
+    reason: "Walk-in retail."
+  - slug: dealership
+    label: "Dealership"
+    include: false
+    overture_codes: [auto_dealer, used_auto_dealer]
+    reason: "Large employer with call centers."
+  - slug: auto_parts
+    label: "Auto parts store"
+    include: false
+    overture_codes: [auto_parts_store]
+    reason: "Shop."
+  - slug: wash_detail
+    label: "Car wash / detailing"
+    include: false
+    overture_codes: [car_wash, auto_detailing]
+    reason: "Walk-in, low ticket."
 
 pain_keywords:
   - call for an appointment
@@ -51,7 +102,10 @@ negative_keywords:
   - live answering 24/7
 
 exclusions:
-  # SEED LIST, INCOMPLETE.
+  # SEED LISTS, INCOMPLETE. Matched on the normalized name (see ICP.md).
+  # chain_name_patterns: brand at the START of the name. Generic-sounding brands
+  # ("Gentle Dental", "Comfort Dental") are left to the website-domain rule,
+  # because many independents share those words.
   chain_name_patterns:
     - midas
     - meineke
@@ -77,6 +131,7 @@ exclusions:
     - sears auto
     - walmart auto care
     - costco tire
+  chain_name_contains: []
   keywords:
     - dealership
     - auto parts
