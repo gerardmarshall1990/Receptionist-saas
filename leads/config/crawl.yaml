@@ -89,6 +89,11 @@ booking_signatures:
   - book now
   - schedule now
   - schedule service online
+  # Request/schedule-service buttons are an online channel too (v2: phone-only was
+  # firing on sites that also had one).
+  - request service
+  - schedule service
+  - request a service
 
 chat_signatures:
   - widget.intercom.io

@@ -178,3 +178,160 @@ def test_snippet_window() -> None:
     assert out.startswith("…")
     assert out.endswith("…")
     assert len(out) <= 302
+
+
+# --------------------------------------------- v2 regressions (from the hand review)
+
+
+def _p(text: str) -> list[Page]:
+    return [Page(url="https://x.test/", title="X", text=text, raw_lower=text.lower())]
+
+
+BIZ = {"name_key": "x", "category": "plumbing"}
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("Contact Us Name Email Leave Us A Message Send Message", False),  # web form label
+        ("Leave us a message, and we'll respond shortly. Send", False),
+        ("Request a Quote ... Leave us a message... Submit", False),
+        ("When we say we will call you back, we do, on the day we said.", False),
+        ("If you leave us a voicemail after hours, we'll get back to you", True),
+        ("If you have to leave a voicemail because all three lines are busy, we will call", True),
+        ("If we miss your call, leave your name and number", True),
+        ("Call or leave a voicemail any time.", True),
+        ("You will never get voicemail when you call us.", False),
+    ],
+)
+def test_leave_message_is_about_voicemail_not_forms(text: str, expected: bool) -> None:
+    assert ("leave_message_text" in extract(_p(text), BIZ, CFG).signals) is expected
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("Your AC unit is working 24/7 to keep you cool.", False),
+        ("Maintenance helps reduce expensive emergency repairs.", False),
+        ("Plumbers in New Jersey AVAILABLE 24/7 SINCE 1965", True),
+        ("24/7 Emergency Service Available", True),
+        ("we respond to emergency calls 24/7, 365 days a year", True),
+        ("If you need immediate or emergency service, please call 815-893-9276.", True),
+    ],
+)
+def test_emergency_claim_context(text: str, expected: bool) -> None:
+    assert ("emergency_247_claim" in extract(_p(text), BIZ, CFG).signals) is expected
+
+
+@pytest.mark.parametrize(
+    ("text", "disqualified", "live_answer_caution"),
+    [
+        ("No answering service or AI. Call us and someone from our team answers.", False, True),
+        ("You will never talk to an answering service or a secretary.", False, True),
+        ("Emergency calls reach a technician rather than an answering service.", False, True),
+        (
+            "No receptionist or answering service here. Fred answers all calls personally.",
+            False,
+            True,
+        ),
+        ("After hours please call and our answering service will assist you.", True, False),
+        ("24-Hour Answering Service. Competitive pricing.", True, False),
+    ],
+)
+def test_answering_service_respects_negation(
+    text: str, disqualified: bool, live_answer_caution: bool
+) -> None:
+    ex = extract(_p(text), BIZ, CFG)
+    assert ("uses_answering_service" in ex.signals) is disqualified
+    assert ("promises_live_answer" in ex.flags) is live_answer_caution
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("Support Customer Service Report Car Shipping Careers We're Hiring", False),  # "Rep-ort"
+        ("We're Hiring For: HVAC Technicians, Lead Installers and Helpers", False),
+        ("Now hiring: front desk receptionist, full time.", True),
+        (
+            "We are always accepting applications for Customer Service, Dispatch, Plumbing jobs. Apply now",
+            True,
+        ),
+    ],
+)
+def test_hiring_needs_a_front_desk_role_next_to_the_hiring_text(text: str, expected: bool) -> None:
+    ex = extract(_p(text), BIZ, CFG)
+    assert ("hiring_receptionist" in ex.signals) is expected
+    if expected:
+        ev = ex.signals["hiring_receptionist"].evidence.lower()
+        assert any(w in ev for w in ("hiring", "apply", "applications"))
+
+
+def test_request_service_button_counts_as_online_booking() -> None:
+    text = "Call for Appointment 1-888-797-5225 Request Service About"
+    s = extract(_p(text), BIZ, CFG).signals
+    assert s["no_online_booking"].value is False
+    assert "phone_only_booking" not in s
+
+
+# ---------------------------------------------- v3 regressions (second hand review)
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        (
+            "I agree to be contacted using an automatic phone dialing system or company voice mail system.",
+            False,
+        ),
+        (
+            "These aren't situations where you want to leave a voicemail or wait for a call back.",
+            False,
+        ),
+        (
+            "Call your regular dentist first. Many practices offer after-hours lines. Leave a clear voicemail.",
+            False,
+        ),
+        ("Customize reminders with email, text messaging, and/or voicemail.", False),
+        (
+            "Did not have to wait for a call-back from an automated system, or voice mail. Highly recommend!",
+            False,
+        ),
+        ("Patients of record can also use the practice voicemail for after-hours questions.", True),
+        (
+            "After hours, please call our main office number and listen to the voicemail instructions.",
+            True,
+        ),
+        ("Left an after hours voicemail when the heater died and they called back.", True),
+    ],
+)
+def test_voicemail_only_when_callers_end_up_there(text: str, expected: bool) -> None:
+    assert ("leave_message_text" in extract(_p(text), BIZ, CFG).signals) is expected
+
+
+def test_live_technician_answering_suppresses_the_247_pain_claim() -> None:
+    ex = extract(
+        _p("24/7 Emergency Service. Emergency calls reach a technician, not a call center."),
+        BIZ,
+        CFG,
+    )
+    assert "emergency_247_claim" not in ex.signals
+    assert "promises_live_answer" in ex.flags
+
+
+@pytest.mark.parametrize(
+    ("text", "multi", "chain"),
+    [
+        ("One doctor, two locations, every patient.", True, False),
+        ("Serving homes and offices in League City.", False, False),
+        ("One of the leading dental offices in Spring, TX.", False, False),
+        (
+            "In 1999 we became part of the Hajoca family, joining over 200 locations nationwide.",
+            True,
+            True,
+        ),
+    ],
+)
+def test_multi_location_vs_chain_scale(text: str, multi: bool, chain: bool) -> None:
+    s = extract(_p(text), BIZ, CFG).signals
+    assert ("multiple_locations" in s) is multi
+    assert ("is_chain" in s) is chain

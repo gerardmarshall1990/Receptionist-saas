@@ -26,7 +26,7 @@ from leads_engine.universe import normalize as nz
 STAGE2_FLAGS = {
     "website_mismatch", "phone_not_on_site", "uses_answering_service", "franchise_disclaimer",
     "crawl_blocked", "robots_disallowed", "website_parked", "website_offsite", "crawl_failed",
-    "thin_homepage",
+    "thin_homepage", "promises_live_answer",
 }  # fmt: skip
 STATUS_FLAG = {
     "blocked": "crawl_blocked", "robots_disallowed": "robots_disallowed", "parked": "website_parked",

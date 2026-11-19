@@ -187,7 +187,7 @@ def test_robots_rules(site: Site, robots: Route, status: str, retryable: bool) -
 # ----------------------------------------------------------------- stop rules
 
 
-@pytest.mark.parametrize("code", [403, 429])
+@pytest.mark.parametrize("code", [202, 401, 403, 406, 409, 429, 466])
 def test_blocks_stop_immediately_and_are_not_retryable(site: Site, code: int) -> None:
     plumber_site(site)
     site.routes["/"] = (code, {}, b"no")

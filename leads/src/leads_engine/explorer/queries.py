@@ -60,6 +60,7 @@ FLAG_LABELS: dict[str, str] = {
     "website_parked": "Website parked / for sale",
     "website_offsite": "Website redirects elsewhere",
     "thin_homepage": "Homepage nearly empty (JS-only?)",
+    "promises_live_answer": "Promises a live person answers (caution)",
 }
 
 # Signals the explorer can filter on ("has evidence for"), from the Stage 2 crawl.

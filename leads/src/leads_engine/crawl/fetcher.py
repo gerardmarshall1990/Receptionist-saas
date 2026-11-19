@@ -203,7 +203,9 @@ async def crawl_site(
                 )
                 return result
             continue  # an inner page failing doesn't sink the site
-        if f.status in {403, 429}:
+        # 403/429 and any other non-404/410 4xx (401, 406, 409, 451, vendor codes like 466)
+        # plus 202 "accepted" pages are how WAFs answer bots: treat as a block, never retry.
+        if f.status in {202, 403, 429} or (400 <= f.status < 500 and f.status not in {404, 410}):
             result.status, result.detail = "blocked", f"HTTP {f.status} on {kind}"
             return result
         if f.status != 200 or not f.body:

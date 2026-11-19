@@ -18,7 +18,9 @@ from leads_engine.config_loader import AppConfig, CategoryConfig
 from leads_engine.crawl.html import Page
 from leads_engine.universe import normalize as nz
 
-EXTRACTOR_VERSION = "stage2-v1"
+EXTRACTOR_VERSION = (
+    "stage2-v3"  # v3: voicemail-as-channel only, n't negation, chain scale, coverage
+)
 SNIPPET = 300
 
 
@@ -42,21 +44,47 @@ def _rx(*patterns: str) -> re.Pattern[str]:
     return re.compile("|".join(f"(?:{p})" for p in patterns), re.I)
 
 
+# Callers hit voicemail / a machine / busy lines. NOT web-form labels ("Leave us a message ... Submit"):
+# v1 matched those and was ~15% precise on review.
 LEAVE_MESSAGE = _rx(
-    r"leave (?:us )?a (?:message|voicemail)", r"leave your name and (?:phone )?number",
-    r"we(?:'|\u2019)?ll call you back", r"we will (?:call you back|return your call)",
-    r"(?:return|returns) (?:your|all) calls?", r"call you back (?:as soon as|within|shortly)",
+    r"leave (?:us )?a voice ?mail", r"(?:practice|office|our|the office) voice ?mail",
+    r"listen to (?:the|our) voice ?mail", r"left (?:an? )?(?:after[- ]hours? )?voice ?mail",
+    r"voice ?mail (?:after hours|for after[- ]hours)", r"after[- ]hours voice ?mail", r"answering machine",
+    r"leave (?:us )?a message (?:after the (?:tone|beep)|on (?:our|the) (?:voice ?mail|machine))",
+    r"leave your name and (?:phone )?number",
+    r"(?:all|our|the) (?:phone )?lines are (?:busy|tied up)",
+    r"if (?:we(?:'|\u2019)?re|we are|no one is) (?:unable to answer|out on (?:a )?(?:job|call)|on another call|"
+    r"busy with (?:a )?customers?|not available)",
+    r"if we (?:miss|can(?:'|\u2019)?t (?:get to|answer)|cannot answer|don(?:'|\u2019)?t answer) your call",
 )  # fmt: skip
+# Boilerplate that mentions voicemail without saying callers end up there.
+LEAVE_MESSAGE_NOT = _rx(
+    r"automatic (?:telephone|phone) dialing",
+    r"consent",
+    r"reminders?",
+    r"many practices",
+    r"your regular dentist",
+)
+# Must read as a claim about their service, not "your AC runs 24/7" or "avoid emergency repairs".
 EMERGENCY = _rx(
-    r"24 ?/ ?7", r"24-7", r"24 hours? a day", r"24[- ]hour (?:emergency|service)",
-    r"emergency (?:service|services|repairs?|calls?|appointments?|plumb\w*|dentist\w*)",
-    r"same[- ]day emergenc\w+", r"around the clock", r"day or night", r"after[- ]hours (?:service|emergenc\w+)",
+    r"(?:available|open|on call|service|services|emergenc\w+|answer\w*|respon\w+|here for you|call us)\W{0,25}24 ?[/-] ?7",
+    r"24 ?[/-] ?7\W{0,25}(?:emergenc\w+|service|availab\w+|support|response|repairs?|plumb\w*|hvac|ac\b|dentist\w*)",
+    r"24 hours? a day", r"24[- ]hours? (?:emergency|service|response)",
+    r"emergency (?:service|services|repairs?|calls?|appointments?|plumb\w*|dentist\w*|dental care|response)",
+    r"same[- ]day emergenc\w+", r"around the clock", r"round[- ]the[- ]clock", r"day or night",
 )  # fmt: skip
+EMERGENCY_NOT = _rx(
+    r"(?:avoid|prevent|reduce|reducing|costly|expensive|minimi[sz]e)\W+(?:\w+\W+){0,3}$",
+    r"(?:running|working|runs|works)\W+$",
+)
 # The business already has someone (or something) answering: no 24/7 pain claim then.
 COVERAGE = _rx(
-    r"live answer\w*", r"answered 24 ?/ ?7", r"(?:a )?real (?:person|human) (?:always )?answers",
+    r"live answer\w*", r"answered 24 ?/ ?7", r"(?:a )?real (?:person|human|plumber|technician|tech) (?:always )?answers",
     r"live person answers", r"we always answer", r"live operators?", r"live dispatch\w*",
-    r"dispatchers? (?:are )?available 24",
+    r"dispatchers? (?:are )?available 24", r"answers? (?:all|every|our) (?:phone )?calls", r"person to person",
+    r"someone (?:from our team )?(?:always )?answers", r"when you call(?: us)?, we answer",
+    r"calls? (?:reach|go (?:straight |directly )?to) (?:a|an|our) (?:technician|tech|plumber|person|human|owner)",
+    r"we answer the phone",
 )  # fmt: skip
 ANSWERING = _rx(
     r"answering service",
@@ -77,11 +105,18 @@ PHONE_ONLY = _rx(
 HIRING_CONTEXT = _rx(
     r"now hiring", r"we(?:'|\u2019)?re hiring", r"we are hiring", r"join our team", r"career opportunit\w+",
     r"job openings?", r"open positions?", r"employment opportunit\w+", r"apply (?:now|today)",
+    r"accepting applications",
 )  # fmt: skip
 FRONT_DESK_ROLES = _rx(
-    r"receptionist", r"front desk", r"front office", r"dispatcher", r"customer service rep\w*",
-    r"call center", r"scheduling coordinator", r"scheduler", r"patient coordinator", r"office assistant",
+    r"receptionists?\b", r"front desk", r"front office", r"dispatchers?\b", r"dispatch (?:position|role|job)",
+    r"customer service rep(?:resentative)?s?\b", r"customer service (?:position|role|job|team member)",
+    r"call center (?:agent|rep)", r"scheduling coordinator", r"patient coordinator", r"office assistant",
+    r"customer service, dispatch",
 )  # fmt: skip
+NEGATION = re.compile(
+    r"(?:\b(?:no|not|never|without|rather than|instead of)\b|\w+n(?:'|\u2019)t\b)[^.!?]{0,60}$",
+    re.I,
+)
 OWNER_OPERATED = _rx(
     r"family[- ]owned", r"locally[- ]owned", r"owner[- ]operated", r"family[- ]operated", r"owner and operator",
 )  # fmt: skip
@@ -90,13 +125,17 @@ FRANCHISE = _rx(
     r"(?:each|every) (?:franchise|location|office) is independently owned",
     r"independently owned and operated franchise", r"franchise (?:location|owner)s?\b",
     r"locally owned (?:and operated )?franchise",
+    # Scale that only chains/distributors have ("joining over 200 locations nationwide").
+    r"(?:over |more than )?\d{2,}\+? (?:locations|offices|branches) (?:nationwide|across (?:the )?(?:us|u\.s\.|country|america))",
 )  # fmt: skip
 PRICING = _rx(
     r"(?:starting at|starts at|from|only|just|flat[- ]rate|special|coupon|save|price)\D{0,20}\$\s?\d{2,5}",
     r"\$\s?\d{2,5}(?:\.\d\d)?\s*(?:off|special|flat rate|service call|diagnostic|exam|cleaning)",
 )  # fmt: skip
 MULTI_LOCATION = _rx(
-    r"our locations", r"(?:two|three|four|five|\d+) locations", r"multiple locations", r"offices in"
+    r"our locations",
+    r"(?:two|three|four|five|\d+) (?:convenient )?locations",
+    r"multiple locations",
 )
 
 _EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9.-]+\.[A-Za-z]{2,24}")
@@ -119,10 +158,38 @@ def snippet(text: str, start: int, end: int, width: int = SNIPPET) -> str:
     return ("…" if a > 0 else "") + out[:width] + ("…" if b < len(text) else "")
 
 
-def _first(rx: re.Pattern[str], pages: list[Page]) -> Hit | None:
+def _negated(text: str, start: int) -> bool:
+    """'No answering service', 'you will never talk to an answering service', 'rather than ...'."""
+    return bool(NEGATION.search(text[max(0, start - 80) : start]))
+
+
+def _first(
+    rx: re.Pattern[str],
+    pages: list[Page],
+    *,
+    skip_negated: bool = False,
+    not_before: re.Pattern[str] | None = None,
+    not_near: re.Pattern[str] | None = None,
+) -> Hit | None:
+    """First match that passes the guards (negation, excluded left context, excluded
+    words within ~120 characters either side)."""
     for p in pages:
-        if m := rx.search(p.text):
+        for m in rx.finditer(p.text):
+            if skip_negated and _negated(p.text, m.start()):
+                continue
+            if not_before and not_before.search(p.text[max(0, m.start() - 40) : m.start()]):
+                continue
+            if not_near and not_near.search(p.text[max(0, m.start() - 120) : m.end() + 120]):
+                continue
             return Hit(True, snippet(p.text, m.start(), m.end()), p.url)
+    return None
+
+
+def _any_negated(rx: re.Pattern[str], pages: list[Page]) -> Hit | None:
+    for p in pages:
+        for m in rx.finditer(p.text):
+            if _negated(p.text, m.start()):
+                return Hit(True, snippet(p.text, m.start(), m.end()), p.url)
     return None
 
 
@@ -178,11 +245,19 @@ def extract(pages: list[Page], business: dict[str, Any], cfg: AppConfig) -> Extr
     # --- disqualifiers -----------------------------------------------------
     vendor = _signature([v for v in cfg.global_.answering_vendor_patterns], pages)
     negative = (
-        _first(re.compile("|".join(re.escape(k) for k in cat.negative_keywords), re.I), pages)
+        _first(
+            re.compile("|".join(re.escape(k) for k in cat.negative_keywords), re.I),
+            pages,
+            skip_negated=True,
+        )
         if cat
         else None
     )
-    answering = _first(ANSWERING, pages)
+    answering = _first(ANSWERING, pages, skip_negated=True)
+    # "No answering service: the owner answers every call" is the opposite of a disqualifier,
+    # but it is a real caution: they sell on live answering.
+    if _any_negated(ANSWERING, pages) or _first(COVERAGE, pages):
+        ex.flags.append("promises_live_answer")
     if vendor:
         sig["uses_answering_service"] = Hit(True, f"Site references {vendor[0]}", vendor[1])
     elif hit := (negative or answering):
@@ -191,11 +266,12 @@ def extract(pages: list[Page], business: dict[str, Any], cfg: AppConfig) -> Extr
         sig["is_chain"] = franchise
 
     # --- pain --------------------------------------------------------------
-    if h := _first(LEAVE_MESSAGE, pages):
+    if h := _first(LEAVE_MESSAGE, pages, skip_negated=True, not_near=LEAVE_MESSAGE_NOT):
         sig["leave_message_text"] = h
     coverage = _first(COVERAGE, pages)
-    if (h := _first(EMERGENCY, pages)) and not coverage and "uses_answering_service" not in sig:
-        sig["emergency_247_claim"] = h
+    emergency = _first(EMERGENCY, pages, not_before=EMERGENCY_NOT)
+    if emergency and not coverage and "uses_answering_service" not in sig:
+        sig["emergency_247_claim"] = emergency
     if h := _first(LIMITED_HOURS, pages):
         sig["limited_hours_text"] = h
 
@@ -214,13 +290,16 @@ def extract(pages: list[Page], business: dict[str, Any], cfg: AppConfig) -> Extr
     if not booking and (h := _first(PHONE_ONLY, pages)):
         sig["phone_only_booking"] = h
 
+    # The role must sit close to the hiring wording, and the evidence must show both.
     for p in pages:
         for m in HIRING_CONTEXT.finditer(p.text):
-            window = p.text[max(0, m.start() - 250) : m.end() + 250]
-            if role := FRONT_DESK_ROLES.search(window):
-                a = max(0, m.start() - 250) + role.start()
+            lo = max(0, m.start() - 150)
+            if role := FRONT_DESK_ROLES.search(p.text[lo : m.end() + 150]):
+                a, b = lo + role.start(), lo + role.end()
+                start, end = min(a, m.start()), max(b, m.end())
+                width = max(SNIPPET, end - start + 20)
                 sig["hiring_receptionist"] = Hit(
-                    True, snippet(p.text, min(a, m.start()), max(a, m.end())), p.url
+                    True, snippet(p.text, start, end, width=width), p.url
                 )
                 break
         if "hiring_receptionist" in sig:
