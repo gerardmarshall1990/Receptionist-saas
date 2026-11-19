@@ -200,3 +200,6 @@ table.leads { width: 100%; border-collapse: collapse; }
   .leads td[data-label]::before { content: attr(data-label) ": "; color: var(--muted); font-size: 12px; }
   .table-wrap { overflow-x: visible; }
 }
+
+mark { background: var(--warn-soft); color: var(--warn); padding: 0 2px; border-radius: 3px; font-style: normal; }
+.avatar { width: 20px; height: 20px; border-radius: 50%; vertical-align: middle; margin-right: 6px; }

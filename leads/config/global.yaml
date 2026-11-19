@@ -184,6 +184,11 @@ normalization:
     - team
     - mail
 
+# Live Google reviews in the explorer: Place Details calls allowed per calendar month.
+# 1,000 = Google's free monthly usage cap for this SKU (so $0 by default). Each call
+# beyond the free cap costs ~$0.025. Reviews are shown live, never stored.
+google_places_monthly_cap: 1000
+
 # Stage 1 pilot: rows per category loaded into Postgres (stratified random,
 # whole US). The full extract stays in Parquet.
 pilot_sample:

@@ -42,6 +42,9 @@ class Settings(BaseSettings):
     ui_host: str = "127.0.0.1"
     ui_port: int = Field(default=8765, ge=1, le=65535)
     ui_token: str | None = None
+    # Only for running outside this sandbox: here the network proxy injects the key
+    # (X-Goog-Api-Key) for places.googleapis.com, so it never lives in the app.
+    google_places_api_key: str | None = None
 
     # Optional overrides for config/models.yaml.
     scoring_model: str | None = None

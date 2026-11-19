@@ -2,6 +2,23 @@
 
 Newest first. One entry per decision that someone might later ask "why?" about.
 
+## 2026-11-19 — Stage 3 redirected: no paid phone lookups; live Google reviews instead
+
+- **No Twilio (user decision).** Phones stay at `likely` at best (Overture + own website agree). Consequence:
+  line type (mobile vs landline) is unknown, which Stage 5's AI-voice rules need; revisit there.
+- **No scraping of Google Search/Maps or social sites** (spec section 7 and those sites' terms).
+- **Google reviews via the official Places API, live only.** Policy read 2026-11-19: place IDs may be stored
+  indefinitely; review text and other Places content may not be copied/stored, and content may not be derived
+  from it. So the explorer fetches rating + up to 5 reviews (Google's relevance pick) when a user clicks, shows
+  them with attribution, highlights phone-pain phrases, and stores only the place ID. Nothing feeds scoring.
+- **Why not batch review mining for the 3M:** ~$25 per 1,000 businesses for 5 mostly-positive reviews each, plus
+  unresolved terms on storing derived signals. Batch use only if counsel approves derived signals.
+- **Reviews on businesses' own sites** were measured instead (free): 3,907 sites show reviews, only 8 mention
+  unanswered calls, and those praise the business vs competitors. Useful as sales-pitch language, not as lead pain.
+- **Cost control:** IDs-only Text Search, then one Place Details call (Enterprise + Atmosphere SKU, $25 per 1,000,
+  first 1,000/month free) reserved against `api_usage`; `google_places_monthly_cap` defaults to the free 1,000.
+  Matches must agree on phone, or on name + ZIP/street number; otherwise "no confident match", nothing stored.
+
 ## 2026-11-19 — Stage 2 (crawl + signals, pilot)
 
 - **Bot identity:** `FrontdeskLeadsBot/0.1`, no contact link (user chose not to publish one).

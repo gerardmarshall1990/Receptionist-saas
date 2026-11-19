@@ -137,6 +137,9 @@ data/                         raw/derived bulk files (Parquet). Gitignored. Neve
 - **Signal rules change only with evidence:** grade a fresh random sample of hits by hand, fix the rule, add every
   false positive you found as a regression test in `tests/test_crawl_extract.py`, bump `EXTRACTOR_VERSION`,
   re-run `leads crawl extract`. A signal under ~90% precision is not used for scoring.
+- **Google Places content is never stored** (policy): only `businesses.google_place_id`. Reviews/ratings are
+  fetched live in the explorer, shown with attribution, and must not feed scoring or signals without counsel.
+  The key is injected by the network proxy for places.googleapis.com (X-Goog-Api-Key), not stored in the app.
 - **Overture release** is pinned in `global.yaml`. Bumping it requires `leads universe census` and re-confirming codes.
 - **Tests that need fixtures** (saved HTML etc.) go in `tests/fixtures/`. Never hit the network in tests.
 

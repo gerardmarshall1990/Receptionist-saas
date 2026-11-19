@@ -406,6 +406,11 @@ function renderDetail(d) {
         el("td", { class: "muted small" }, [e.is_role_based ? "role" : "named", e.is_freemail ? "free-mail" : null, e.domain_matches_site ? "own domain" : null].filter(Boolean).join(", ")))))) : null,
   ));
 
+  const gbox = el("div", { id: "google-box" },
+    el("p", { class: "muted small" }, "Google rating and up to 5 reviews, fetched live from Google Maps when you ask (not stored). One lookup per click."),
+    el("button", { type: "button", class: "btn", onclick: () => loadGoogle(b.id, gbox) }, "Load Google reviews"));
+  body.push(section("Google reviews (live)", gbox));
+
   const cat = META.categories.find((c) => c.slug === b.category);
   if (cat) {
     body.push(section("Best call windows (business local time)",
@@ -463,6 +468,56 @@ function closeLead() {
   state.lead = "";
   writeUrl();
   for (const tr of $("#rows").children) tr.classList.remove("selected");
+}
+
+// ----------------------------------------------------------- Google live
+
+function highlighted(text, terms) {
+  // Split on the pain phrases and wrap matches in <mark>, using text nodes only.
+  const esc = terms.filter(Boolean).map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  if (!esc.length) return [text];
+  const rx = new RegExp(`(${esc.join("|")})`, "gi");
+  return text.split(rx).map((part, i) => (i % 2 ? el("mark", {}, part) : part));
+}
+
+async function loadGoogle(id, box) {
+  box.replaceChildren(el("p", { class: "muted" }, "Asking Google…"));
+  let d;
+  try {
+    d = await api(`/api/leads/${encodeURIComponent(id)}/google`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: "{}",
+    });
+  } catch (err) {
+    box.replaceChildren(el("p", { class: "error" }, `Google reviews unavailable: ${err.message}`));
+    return;
+  }
+  if (d.status !== "matched") {
+    box.replaceChildren(el("p", { class: "muted" }, d.detail));
+    return;
+  }
+  const p = d.place;
+  const maps = p.maps_url && safeUrl(p.maps_url);
+  const out = [
+    el("div", {}, el("strong", {}, p.rating != null ? `★ ${p.rating.toFixed(1)}` : "No rating"),
+      " ", el("span", { class: "muted" }, `${p.rating_count ?? 0} reviews on `),
+      maps ? el("a", { href: maps, target: "_blank", rel: "noopener noreferrer" }, "Google Maps") : "Google Maps"),
+    el("p", { class: "muted small" }, `Matched: ${d.detail}. ${p.name || ""}, ${p.address || ""}`),
+  ];
+  for (const r of p.reviews) {
+    const url = r.url && safeUrl(r.url);
+    const authorUrl = r.author_url && safeUrl(r.author_url);
+    const photo = r.author_photo && safeUrl(r.author_photo);
+    out.push(el("div", { class: "reason" },
+      el("div", {},
+        photo && photo.startsWith("https://lh3.googleusercontent.com/") ? el("img", { src: photo, alt: "", class: "avatar", referrerpolicy: "no-referrer" }) : null,
+        authorUrl ? el("a", { href: authorUrl, target: "_blank", rel: "noopener noreferrer" }, r.author || "Google user") : (r.author || "Google user"),
+        " ", el("span", { class: "muted small" }, `${r.rating ? "★".repeat(r.rating) : ""} ${r.when || ""}`)),
+      el("q", {}, ...highlighted(r.text || "", d.highlight)),
+      url ? el("a", { href: url, target: "_blank", rel: "noopener noreferrer", class: "small" }, "View on Google Maps") : null));
+  }
+  if (!p.reviews.length) out.push(el("p", { class: "muted" }, "Google returned no review text."));
+  out.push(el("p", { class: "muted small" }, d.notice));
+  box.replaceChildren(...out);
 }
 
 // -------------------------------------------------------------- suppress

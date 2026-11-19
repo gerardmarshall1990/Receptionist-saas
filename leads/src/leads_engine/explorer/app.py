@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
+import httpx
 import psycopg
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
@@ -25,6 +26,7 @@ from pydantic import BaseModel, Field
 
 from leads_engine.config_loader import AppConfig
 from leads_engine.explorer import facts as fx
+from leads_engine.explorer import google as gx
 from leads_engine.explorer import queries as qx
 from leads_engine.log import get_logger
 from leads_engine.settings import Settings
@@ -62,6 +64,7 @@ def create_app(
     cfg: AppConfig,
     pool: ConnectionPool | None = None,
     agg_cache_seconds: float = AGG_CACHE_SECONDS,
+    places_client: gx.PlacesClient | None = None,
 ) -> FastAPI:
     pool = pool or ConnectionPool(
         settings.database_url,
@@ -110,7 +113,8 @@ def create_app(
         resp.headers["X-Content-Type-Options"] = "nosniff"
         resp.headers["Referrer-Policy"] = "no-referrer"
         resp.headers["Content-Security-Policy"] = (
-            "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self';"
+            "default-src 'self'; img-src 'self' data: https://lh3.googleusercontent.com;"
+            " style-src 'self'; script-src 'self';"
             " connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
         )
         return resp
@@ -397,6 +401,77 @@ def create_app(
             "local_time": lt.strftime("%a %H:%M") if lt else None,
             "callable_now": fx.callable_now(cat, b["tz"]),
             "category_label": cat.label if cat else b["category"],
+        }
+
+    places_holder: dict[str, gx.PlacesClient] = {}
+
+    def places() -> gx.PlacesClient:
+        if "c" not in places_holder:
+            places_holder["c"] = places_client or gx.PlacesClient(settings.google_places_api_key)
+        return places_holder["c"]
+
+    @app.post("/api/leads/{lead_id}/google")
+    def google_reviews(lead_id: UUID) -> dict[str, Any]:
+        """Live Google rating + up to 5 reviews. Costs one Place Details call (capped)."""
+        with conn() as c:
+            lead = c.execute(
+                "select id, name, address, city, state, postcode, lat, lng, phone, category,"
+                " google_place_id,"
+                " array(select e164 from phones p where p.business_id = b.id) as phones"
+                " from businesses b where id = %s",
+                (lead_id,),
+            ).fetchone()
+            if lead is None:
+                raise HTTPException(404, "lead not found")
+            try:
+                res = gx.live_reviews(c, places(), lead, cfg.global_.google_places_monthly_cap)
+            except gx.CapReachedError as exc:
+                raise HTTPException(429, str(exc)) from exc
+            except httpx.HTTPStatusError as exc:
+                code = exc.response.status_code
+                if code in {401, 403}:
+                    raise HTTPException(
+                        503, "Google Places API key missing or not authorized"
+                    ) from exc
+                raise HTTPException(502, f"Google Places error {code}") from exc
+            except httpx.HTTPError as exc:
+                raise HTTPException(
+                    502, f"Google Places unreachable: {type(exc).__name__}"
+                ) from exc
+        cat = cfg.categories.get(lead["category"])
+        p = res.place
+        return {
+            "status": res.status,
+            "detail": res.detail,
+            "place": {
+                "name": (p.get("displayName") or {}).get("text"),
+                "address": p.get("formattedAddress"),
+                "phone": p.get("internationalPhoneNumber"),
+                "rating": p.get("rating"),
+                "rating_count": p.get("userRatingCount"),
+                "maps_url": p.get("googleMapsUri"),
+                "reviews": [
+                    {
+                        "author": (r.get("authorAttribution") or {}).get("displayName"),
+                        "author_url": (r.get("authorAttribution") or {}).get("uri"),
+                        "author_photo": (r.get("authorAttribution") or {}).get("photoUri"),
+                        "rating": r.get("rating"),
+                        "when": r.get("relativePublishTimeDescription"),
+                        "text": (r.get("text") or r.get("originalText") or {}).get("text", ""),
+                        "url": r.get("googleMapsUri"),
+                    }
+                    for r in p.get("reviews") or []
+                ],
+            }
+            if res.status == "matched"
+            else None,
+            "highlight": sorted(
+                set(cat.review_pain_keywords if cat else []) | set(gx.GENERIC_PAIN)
+            ),
+            "notice": "Up to 5 reviews, chosen and ordered by Google by relevance."
+            " Reviews aren't verified by Google, but Google checks for and removes fake"
+            " content when it's identified."
+            " Shown live from Google Maps; not stored.",
         }
 
     @app.post("/api/leads/{lead_id}/suppress")

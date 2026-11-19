@@ -111,6 +111,9 @@ class GlobalConfig(Strict):
     chain_detection: ChainDetection
     normalization: Normalization
     pilot_sample: dict[Slug, Annotated[int, Field(gt=0)]]
+    # Live Google reviews (Places API Place Details, Enterprise + Atmosphere SKU).
+    # Place Details calls per calendar month; 1,000 is Google's free monthly cap.
+    google_places_monthly_cap: Annotated[int, Field(ge=0, le=100_000)] = 1000
     watch_list: list[Slug]
     open_questions: list[str] = []
 
