@@ -22,7 +22,12 @@ Rule: a signal under ~90% precision is not used for scoring (Stage 4).
 | `multiple_locations` | 2/2 | 6/8 | 8/8 | – | "offices in <city>" dropped in v3; "N locations nationwide" is now a chain signal. |
 
 Totals: v1 ~72/97 (74%), v2 77/87 (89%), **v3 93/100 (93%)**. v4 fixes the 7 remaining review-3 false positives
-(each is a regression test); it has not had its own blind review yet. Do one before Stage 4 uses the weights.
+(each is a regression test).
+
+**v5 (final for the pilot):** a real lead in the explorer showed "leave your name and number *below*" (a web form)
+counted as voicemail; fixed. Then **every** `leave_message_text` hit in the pilot was reviewed (not a sample):
+**45/46 (98%)**. The one miss is a patient review where the *dentist* left the voicemail.
+The other signals have not had a blind review on v4/v5; do one before Stage 4 uses the weights.
 
 ## What the reviews taught (for scoring)
 

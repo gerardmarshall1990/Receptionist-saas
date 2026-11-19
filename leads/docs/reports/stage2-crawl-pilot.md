@@ -1,6 +1,6 @@
 # Stage 2 pilot report: crawl + signals
 
-Generated 2026-11-19 17:05 UTC by `leads crawl report`. Config hash `b017a5253eb0905c`, user agent `FrontdeskLeadsBot/0.1`.
+Generated 2026-11-19 17:19 UTC by `leads crawl report`. Config hash `b017a5253eb0905c`, user agent `FrontdeskLeadsBot/0.1`.
 
 ## 1. Crawl outcome (per website)
 
@@ -61,7 +61,7 @@ Pages by kind: home 10,754, contact 7,292, about 6,355, services 5,347, booking 
 | no_online_booking | 41.2% | 51.5% | 56.7% |
 | no_chat_widget | 81.8% | 80.8% | 83.4% |
 | single_phone_number | 44.2% | 53.1% | 52.8% |
-| leave_message_text | 0.5% | 0.3% | 0.4% |
+| leave_message_text | 0.5% | 0.2% | 0.3% |
 | limited_hours_text | 32.3% | 13.4% | 13.4% |
 | emergency_247_claim | 33.7% | 52.7% | 54.9% |
 | hiring_receptionist | 0.9% | 1.1% | 0.8% |
