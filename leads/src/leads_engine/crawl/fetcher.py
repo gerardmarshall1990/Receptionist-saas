@@ -247,15 +247,9 @@ async def crawl_site(
 def make_client(cfg: CrawlConfig) -> httpx.AsyncClient:
     return httpx.AsyncClient(
         headers={"User-Agent": cfg.user_agent, "Accept": "text/html,application/xhtml+xml"},
-        # pool=60: waiting for a free connection is our bottleneck, not the site's fault.
         timeout=httpx.Timeout(cfg.timeout_s, pool=60.0),
         follow_redirects=True,
         max_redirects=cfg.max_redirects,
-        # Every site is a different host, so idle keep-alive connections only block the
-        # pool: expire them fast (v1 ran out of connections -> PoolTimeout).
-        limits=httpx.Limits(
-            max_connections=cfg.concurrency_sites * 4,
-            max_keepalive_connections=cfg.concurrency_sites,
-            keepalive_expiry=5.0,
-        ),
+        # One client per site: at most one request in flight per site anyway.
+        limits=httpx.Limits(max_connections=4, max_keepalive_connections=2, keepalive_expiry=5.0),
     )

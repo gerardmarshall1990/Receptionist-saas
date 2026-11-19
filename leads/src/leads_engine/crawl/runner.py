@@ -26,6 +26,7 @@ from leads_engine.crawl.fetcher import LOCAL_ERROR, Fetched, SiteResult, crawl_s
 from leads_engine.log import get_logger
 
 LOCK_STALE = "15 minutes"
+LOCAL_ERROR_BREAKER = 20  # this many local failures in a row = our side is broken: stop
 FLUSH_SITES = 50
 PAGE_SCHEMA = pa.schema(
     [
@@ -181,39 +182,55 @@ async def run(
     claimed = 0
     sem = asyncio.Semaphore(cfg.concurrency_sites)
     with psycopg.connect(url, autocommit=True) as conn:
-        async with make_client(cfg) as client:
+        # A fresh small client per site: every site is a different host (nothing to reuse),
+        # and a connection slot leaked by a failed proxy tunnel can't pile up across
+        # thousands of sites (a shared client did exactly that and stalled the pilot run).
+        local_errors = 0
 
-            async def one(domain: str, start: str) -> None:
-                async with sem:
-                    try:
+        async def one(domain: str, start: str) -> None:
+            nonlocal local_errors
+            async with sem:
+                try:
+                    async with make_client(cfg) as client:
                         res = await crawl_site(client, cfg, domain, start)
-                    except Exception as exc:  # a bug in one site must not stop the run
-                        res = SiteResult(
-                            domain,
-                            "error",
-                            detail=f"crawler error: {type(exc).__name__}: {exc}"[:500],
-                        )
-                    buf.add(res)
+                except Exception as exc:  # a bug in one site must not stop the run
+                    res = SiteResult(
+                        domain, "error", detail=f"crawler error: {type(exc).__name__}: {exc}"[:500]
+                    )
+                local_errors = local_errors + 1 if res.detail == LOCAL_ERROR else 0
+                buf.add(res)
 
-            tasks: set[asyncio.Task[None]] = set()
-            while True:
-                room = cfg.concurrency_sites * 2 - len(tasks)
-                if room > 0 and claimed < max_sites and time.monotonic() < deadline:
-                    batch = claim(conn, worker, min(room, max_sites - claimed), cfg.max_attempts)
-                    claimed += len(batch)
-                    for domain, start in batch:
-                        tasks.add(asyncio.create_task(one(domain, start)))
-                    if not batch and not tasks:
-                        break
-                elif not tasks:
+        tasks: set[asyncio.Task[None]] = set()
+        while True:
+            if local_errors >= LOCAL_ERROR_BREAKER:
+                log.error("crawl_circuit_breaker", consecutive_local_errors=local_errors)
+                for t in tasks:
+                    t.cancel()
+                break
+            room = cfg.concurrency_sites * 2 - len(tasks)
+            if room > 0 and claimed < max_sites and time.monotonic() < deadline:
+                batch = claim(conn, worker, min(room, max_sites - claimed), cfg.max_attempts)
+                claimed += len(batch)
+                for domain, start in batch:
+                    tasks.add(asyncio.create_task(one(domain, start)))
+                if not batch and not tasks:
                     break
-                done, tasks = await asyncio.wait(
-                    tasks, timeout=5, return_when=asyncio.FIRST_COMPLETED
-                )
-                if len(buf.results) >= FLUSH_SITES:
-                    buf.flush(conn, cfg.max_attempts)
-                    log.info("crawl_progress", claimed=claimed, **buf.counts)
-                _ = done
-            buf.flush(conn, cfg.max_attempts)
+            elif not tasks:
+                break
+            _, tasks = await asyncio.wait(tasks, timeout=5, return_when=asyncio.FIRST_COMPLETED)
+            if len(buf.results) >= FLUSH_SITES:
+                buf.flush(conn, cfg.max_attempts)
+                log.info("crawl_progress", claimed=claimed, **buf.counts)
+        buf.flush(conn, cfg.max_attempts)
+        if local_errors >= LOCAL_ERROR_BREAKER:
+            # Unfinished claims go back to the queue untouched.
+            conn.execute(
+                "update crawl_sites set status = 'pending', attempts = greatest(attempts - 1, 0),"
+                " locked_by = null where status = 'running' and locked_by = %s",
+                (worker,),
+            )
+            raise RuntimeError(
+                f"stopped: {local_errors} consecutive local network errors (our side, not sites)"
+            )
     log.info("crawl_finished", claimed=claimed, **buf.counts)
     return {"claimed": claimed, **buf.counts}

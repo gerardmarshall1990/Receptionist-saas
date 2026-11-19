@@ -161,3 +161,26 @@ def test_local_pool_timeout_does_not_use_up_an_attempt(fresh_db: str, tmp_path: 
         buf.flush(conn, 3)
         row = conn.execute("select status, attempts from crawl_sites").fetchone()
     assert row == ("pending", 0)
+
+
+def test_circuit_breaker_stops_on_repeated_local_errors(
+    fresh_db: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from leads_engine.crawl import fetcher
+
+    db.migrate(fresh_db)
+    with psycopg.connect(fresh_db, autocommit=True) as conn:
+        conn.execute(
+            "insert into crawl_sites (domain, start_url)"
+            " select 's' || g || '.test', 'http://s' || g || '.test/' from generate_series(1, 40) g"
+        )
+
+    async def broken(*args: object, **kw: object) -> fetcher.SiteResult:
+        return fetcher.SiteResult(str(args[2]), "error", detail=fetcher.LOCAL_ERROR, retryable=True)
+
+    monkeypatch.setattr(runner, "crawl_site", broken)
+    with pytest.raises(RuntimeError, match="consecutive local"):
+        asyncio.run(runner.run(fresh_db, FAST, tmp_path, max_sites=1000, time_limit_s=60))
+    with psycopg.connect(fresh_db) as conn:
+        rows = conn.execute("select status, max(attempts) from crawl_sites group by 1").fetchall()
+    assert rows == [("pending", 0)]  # nothing burned, nothing stuck in "running"
