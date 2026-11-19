@@ -1,0 +1,61 @@
+# Global rules that apply across every category. Versioned: bump `version` on
+# any change so runs record which rules they used (config_hash also changes).
+version: 1
+
+# Rollout order per spec section 0. Only US is enabled until Stage 7.
+countries_enabled: [US]
+# Universe size the cost projections assume (spec: ~3M across US/CA/AU/UK).
+universe_target: 3000000
+
+# No category may schedule calls outside these local-time bounds (the
+# business's own timezone). Federal TCPA allows 8am-9pm; several state
+# mini-TCPA laws are stricter (e.g. 8pm end), so the bound is the stricter one.
+# This is an engineering guard rail, NOT legal advice: counsel must confirm
+# before any calling (spec section 7). Day-of-week/holiday rules: OPEN.
+calling_hours_hard_bounds:
+  earliest: "08:00"
+  latest: "20:00"
+  note: "Conservative intersection of TCPA and the strictest state rules known; counsel to confirm per state and country."
+
+# Matched case-insensitively against name + site text for every category.
+# A hit means "exclude" (spec section 1: shops, travel agencies, chains,
+# large employers; section 4: already has an answering service).
+global_exclusion_keywords:
+  - answering service
+  - virtual receptionist
+  - ai receptionist
+  - 24/7 live answering
+  - call center
+  - franchise opportunities
+  - "own a franchise"
+  - travel agency
+  - nationwide locations
+  - "locations nationwide"
+
+# Answering-service / AI-receptionist vendor names. A mention on the business's
+# own site means the need is already solved -> exclude (spec section 4).
+# SEED LIST, INCOMPLETE; grow it from crawl data in Stage 2.
+answering_vendor_patterns:
+  - ruby receptionists
+  - smith.ai
+  - answerconnect
+  - patlive
+  - abby connect
+  - nexa receptionists
+  - answerforce
+  - dialzara
+  - goodcall
+  - my ai front desk
+
+# Categories to test later; not configured yet (spec section 1).
+watch_list:
+  - veterinary
+  - med_spa_salon
+  - property_management
+  - locksmith_towing_garage_door
+  - real_estate_agency
+
+open_questions:
+  - "Day-of-week and holiday calling restrictions per state (some states restrict Sundays/holidays). Needs counsel."
+  - "AI-voice outbound rules (FCC treats AI-generated voices as 'artificial' under TCPA): what consent is required for B2B calls to landlines vs mobiles? Needs counsel before Stage 5."
+  - "Is the 3M target the universe (T0) or the exported, verified set? This config assumes universe."

@@ -1,0 +1,102 @@
+# Roofing and restoration (water/fire damage). Spec rank 4. Not in the pilot.
+# One config with two subcategories; split if outcomes diverge.
+slug: roofing_restoration
+label: Roofing and restoration
+rank: 4
+pilot_phase: null
+niche_knowledge_slug: null
+value_weight: 0.90
+why_converts:
+  - "Storms create bursts of calls at once; a small office can't answer them all."
+  - "Water/fire damage is urgent and often after hours; first company to answer wins."
+  - "Very high ticket (roofs $10k+, restoration often insurance-paid $5k-$50k)."
+
+source_codes:
+  status: unconfirmed
+  overture: [roofing, damage_restoration, water_damage_restoration, fire_and_water_damage_restoration, mold_remediation]
+  osm: ["craft=roofer"]
+  note: "OSM has no standard tag for damage restoration. Verify Overture codes in Stage 1."
+
+subcategories:
+  - {slug: roofing, label: Roofing contractor, include: true}
+  - {slug: water_fire_restoration, label: Water/fire damage restoration, include: true}
+  - {slug: mold_remediation, label: Mold remediation, include: true, reason: "Usually the same firms as water restoration."}
+  - {slug: gutters_only, label: Gutters only, include: false, reason: "Low ticket, not urgent."}
+  - {slug: roofing_supply, label: Roofing supply, include: false, reason: "Shop/distributor."}
+
+pain_keywords:
+  - 24/7
+  - 24 hour
+  - emergency service
+  - storm damage
+  - water damage
+  - fire damage
+  - emergency tarp
+  - leak repair
+  - after hours
+  - leave a message
+  - we'll call you back
+  - free inspection
+  - call now
+
+review_pain_keywords:
+  - never answers
+  - went to voicemail
+  - voicemail
+  - couldn't get through
+  - called multiple times
+  - hard to reach
+  - never called back
+  - didn't call back
+  - never showed up
+
+negative_keywords:
+  - live operators 24/7
+  - call center
+
+exclusions:
+  # SEED LIST, INCOMPLETE. Restoration is heavily franchised.
+  chain_name_patterns:
+    - servpro
+    - servicemaster
+    - paul davis
+    - belfor
+    - rainbow restoration
+    - 911 restoration
+    - puroclean
+    - rytech
+    - first onsite
+  keywords:
+    - roofing supply
+    - wholesale
+    - distributor
+    - storm chaser
+  note: "Out-of-state 'storm chaser' roofers show up after big storms; detect by address far from service area in Stage 2."
+
+staff_target: {min: 2, typical: 8, max: 20, hard_max: 50}
+
+best_call_windows:
+  - days: [mon, tue, wed, thu, fri]
+    start: "08:00"
+    end: "09:30"
+    why: "Before crews head out."
+  - days: [mon, tue, wed, thu, fri]
+    start: "15:30"
+    end: "17:30"
+    why: "Crews wrapping; owner back at the office or truck."
+
+opener_templates:
+  - id: storm_surge
+    requires_signal: emergency_247_claim
+    template: "I saw {name} handles emergency calls, so when a storm hits and fifty people call in an hour, how many get through?"
+  - id: leave_a_message
+    requires_signal: leave_message_text
+    template: "Your site asks callers to leave a message, and someone with water coming through the ceiling usually calls the next company."
+  - id: hard_to_reach_reviews
+    requires_signal: review_hard_to_reach
+    template: "A couple of reviews for {name} mention trouble reaching you by phone, which is exactly the problem we fix."
+
+open_questions:
+  - "One config or split roofing vs. restoration? Roofers are storm/seasonal; restoration is 24/7 and insurance-driven."
+  - "Should we skip calling roofers in the days right after a local storm (they're slammed) or prioritize them?"
+  - "No niche knowledge file in the main app yet."

@@ -1,0 +1,15 @@
+# Local Postgres for the leads engine. Port 5433 so it never collides with the
+# main app's Postgres on 5432.
+services:
+  leads-db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: leads
+      POSTGRES_PASSWORD: leads
+      POSTGRES_DB: frontdesk_leads
+    ports:
+      - "5433:5432"
+    volumes:
+      - leads-db-data:/var/lib/postgresql/data
+volumes:
+  leads-db-data:

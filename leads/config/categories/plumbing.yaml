@@ -1,0 +1,114 @@
+# Plumbing. Spec rank 1, pilot phase (a). All weights/windows are hypotheses
+# until outcome data (Stage 6/8) re-ranks them.
+slug: plumbing
+label: Plumbing
+rank: 1
+pilot_phase: a
+niche_knowledge_slug: plumber   # knowledge/niches/plumber.json in the main app
+value_weight: 0.80
+why_converts:
+  - "Emergency jobs (burst pipes, backups): the caller rings the next plumber if nobody answers."
+  - "Owner is usually on site with hands full; nobody else answers."
+  - "After-hours calls are the highest-value jobs and the most often missed."
+  - "One emergency job (~$300-$1,500+) covers the $389/mo price."
+
+source_codes:
+  status: unconfirmed
+  overture: [plumbing, water_heater_installation_repair, sewer_services]
+  osm: ["craft=plumber"]
+  note: "Overture codes written from memory of the taxonomy; Stage 1 must check them against the release's category list before querying."
+
+subcategories:
+  - {slug: residential_plumbing, label: Residential plumbing, include: true}
+  - {slug: drain_sewer, label: Drain and sewer, include: true}
+  - {slug: water_heater, label: Water heater install/repair, include: true}
+  - {slug: plumbing_supply, label: Plumbing supply store, include: false, reason: "Shop, not a service business (spec excludes shops)."}
+
+# Website text that suggests calls are missed or phone-dependent.
+pain_keywords:
+  - 24/7
+  - 24 hour
+  - 24 hours
+  - emergency plumber
+  - emergency service
+  - after hours
+  - leave a message
+  - leave us a message
+  - we'll call you back
+  - we will call you back
+  - call for a free estimate
+  - call now
+  - same day service
+  - weekends by appointment
+
+review_pain_keywords:
+  - never answers
+  - never answered
+  - went to voicemail
+  - voicemail
+  - couldn't get through
+  - called multiple times
+  - called several times
+  - hard to reach
+  - never called back
+  - didn't call back
+
+# Category-specific "already solved" phrases (disqualify). Vendor names and
+# generic phrases live in config/global.yaml.
+negative_keywords:
+  - live dispatcher 24/7
+  - our dispatchers answer 24/7
+
+exclusions:
+  # SEED LIST, INCOMPLETE. Matched case-insensitively on whole words against the
+  # business name. Franchise brands of independently owned units are still
+  # excluded (spec: exclude chains/franchises).
+  chain_name_patterns:
+    - roto-rooter
+    - mr. rooter
+    - mr rooter
+    - benjamin franklin plumbing
+    - ars rescue rooter
+    - rescue rooter
+    - one hour heating & air
+    - home depot
+    - lowe's
+  keywords:
+    - plumbing supply
+    - supply house
+    - wholesale
+  note: "Chain list seeded by hand; extend from data in Stage 1 (names repeated across many cities)."
+
+staff_target: {min: 1, typical: 4, max: 20, hard_max: 50}
+
+# Local time of the business. Must sit inside global calling_hours_hard_bounds.
+best_call_windows:
+  - days: [mon, tue, wed, thu, fri]
+    start: "08:00"
+    end: "09:00"
+    why: "Before or between first jobs; owner often in the truck."
+  - days: [mon, tue, wed, thu, fri]
+    start: "16:00"
+    end: "18:00"
+    why: "Winding down after the last job."
+
+# One sentence, tied to one stored signal. {evidence} is filled only from the
+# stored snippet for that signal. No genuine signal -> opener is null.
+opener_templates:
+  - id: emergency_after_hours
+    requires_signal: emergency_247_claim
+    template: "I saw {name} offers 24/7 emergency service, so when a call comes in at 2am while you're on another job, who picks it up?"
+  - id: leave_a_message
+    requires_signal: leave_message_text
+    template: "Your site asks callers to leave a message, and I'm curious how many of them call the next plumber instead of waiting."
+  - id: hiring_front_desk
+    requires_signal: hiring_receptionist
+    template: "I noticed {name} is hiring someone to answer phones, and we can cover every call starting this week while you look."
+  - id: phone_only
+    requires_signal: phone_only_booking
+    template: "It looks like the only way to book {name} is by phone, so every missed call is a missed job."
+
+open_questions:
+  - "Value weight 0.80 is a guess; refit from outcomes."
+  - "Is an emergency plumber who advertises 24/7 but has a dispatcher a negative, or still a fit (dispatcher overflow)?"
+  - "Should seasonal timing (winter freeze-ups) change call priority?"

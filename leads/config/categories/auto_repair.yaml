@@ -1,0 +1,113 @@
+# Auto repair and body shops. Spec rank 7.
+slug: auto_repair
+label: Auto repair and body shops
+rank: 7
+pilot_phase: null
+niche_knowledge_slug: null
+value_weight: 0.55
+why_converts:
+  - "Mechanics are under cars; the phone rings out."
+  - "Steady booking and status-check calls all day."
+  - "Body/collision jobs are high ticket and often insurance-paid."
+
+source_codes:
+  status: unconfirmed
+  overture: [automotive_repair, auto_body_shop, auto_glass_service, transmission_repair, brake_service_and_repair]
+  osm: ["shop=car_repair"]
+  note: "OSM body shops are shop=car_repair + service:vehicle:body_repair=yes. Verify Overture codes in Stage 1."
+
+subcategories:
+  - {slug: general_repair, label: General auto repair, include: true}
+  - {slug: body_collision, label: Body/collision, include: true}
+  - {slug: transmission, label: Transmission, include: true}
+  - {slug: quick_lube, label: Oil change / quick lube, include: false, reason: "Walk-in, low ticket, chain-dominated."}
+  - {slug: dealership_service, label: Dealership service department, include: false, reason: "Large employer with call centers."}
+  - {slug: auto_parts, label: Auto parts store, include: false, reason: "Shop."}
+
+pain_keywords:
+  - call for an appointment
+  - call to schedule
+  - call for a quote
+  - leave a message
+  - we'll call you back
+  - closed weekends
+  - closed saturday
+  - closed sunday
+  - towing available
+
+review_pain_keywords:
+  - never answers
+  - never picks up
+  - went to voicemail
+  - voicemail
+  - couldn't get through
+  - called multiple times
+  - hard to reach
+  - never called back
+  - had to drive over
+
+negative_keywords:
+  - answered by our call center
+  - live answering 24/7
+
+exclusions:
+  # SEED LIST, INCOMPLETE.
+  chain_name_patterns:
+    - midas
+    - meineke
+    - jiffy lube
+    - pep boys
+    - firestone complete auto care
+    - goodyear auto service
+    - monro
+    - valvoline
+    - maaco
+    - caliber collision
+    - gerber collision
+    - crash champions
+    - service king
+    - christian brothers automotive
+    - precision tune
+    - aamco
+    - tires plus
+    - big o tires
+    - les schwab
+    - take 5
+    - mavis
+    - sears auto
+    - walmart auto care
+    - costco tire
+  keywords:
+    - dealership
+    - auto parts
+    - car wash
+    - quick lube
+  note: "Do NOT exclude on 'tire' alone: many independents are named '... Auto & Tire'."
+
+staff_target: {min: 2, typical: 5, max: 15, hard_max: 40}
+
+best_call_windows:
+  - days: [mon, tue, wed, thu, fri]
+    start: "10:00"
+    end: "11:30"
+    why: "After morning drop-offs."
+  - days: [mon, tue, wed, thu, fri]
+    start: "14:00"
+    end: "16:00"
+    why: "Before evening pickups."
+
+opener_templates:
+  - id: under_the_car
+    requires_signal: phone_only_booking
+    template: "It looks like customers can only book {name} by phone, so when your team is under a car, those calls ring out."
+  - id: leave_a_message
+    requires_signal: leave_message_text
+    template: "Your site asks callers to leave a message, and most drivers with a breakdown call the next shop."
+  - id: hard_to_reach_reviews
+    requires_signal: review_hard_to_reach
+    template: "A few reviews for {name} mention not getting through on the phone, and we answer every call so your techs don't have to."
+
+open_questions:
+  - "Value weight 0.55 is the lowest; does the $389 price clear the bar for small general-repair shops?"
+  - "Shops with online booking or text-for-status tools: down-score pain only (current rule), or exclude?"
+  - "No auto niche knowledge file in the main app yet."

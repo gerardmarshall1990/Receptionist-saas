@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.env
+# Raw and derived bulk data never goes in git.
+data/
+*.parquet
+*.duckdb
+*.duckdb.wal

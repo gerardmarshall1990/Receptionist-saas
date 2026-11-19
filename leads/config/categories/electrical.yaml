@@ -1,0 +1,88 @@
+# Electrical. Spec rank 3. Not in the pilot.
+slug: electrical
+label: Electrical
+rank: 3
+pilot_phase: null
+niche_knowledge_slug: null   # no niche file in the main app yet
+value_weight: 0.70
+why_converts:
+  - "Outages and sparking/burning smells are urgent calls."
+  - "Owner-operators are common and are on the job, not at a desk."
+  - "Panel upgrades, EV chargers and rewires are mid-to-high ticket."
+
+source_codes:
+  status: unconfirmed
+  overture: [electrician, electrical_contractor]
+  osm: ["craft=electrician"]
+  note: "Verify Overture codes in Stage 1."
+
+subcategories:
+  - {slug: residential_electrical, label: Residential electrician, include: true}
+  - {slug: commercial_electrical, label: Commercial electrician, include: true}
+  - {slug: electrical_supply, label: Electrical supply store, include: false, reason: "Shop."}
+  - {slug: low_voltage_only, label: Low-voltage/AV only, include: false, reason: "Different buyer; revisit later."}
+
+pain_keywords:
+  - 24/7
+  - 24 hour
+  - emergency electrician
+  - emergency service
+  - power outage
+  - after hours
+  - leave a message
+  - we'll call you back
+  - call for a free estimate
+  - call now
+
+review_pain_keywords:
+  - never answers
+  - went to voicemail
+  - voicemail
+  - couldn't get through
+  - called multiple times
+  - hard to reach
+  - never called back
+  - didn't call back
+
+negative_keywords:
+  - live dispatcher 24/7
+
+exclusions:
+  # SEED LIST, INCOMPLETE.
+  chain_name_patterns:
+    - mister sparky
+    - mr. electric
+    - mr electric
+    - home depot
+  keywords:
+    - electrical supply
+    - wholesale
+    - distributor
+  note: ""
+
+staff_target: {min: 1, typical: 4, max: 15, hard_max: 40}
+
+best_call_windows:
+  - days: [mon, tue, wed, thu, fri]
+    start: "08:00"
+    end: "09:00"
+    why: "Before the first job."
+  - days: [mon, tue, wed, thu, fri]
+    start: "16:00"
+    end: "18:00"
+    why: "After jobs wrap."
+
+opener_templates:
+  - id: emergency_after_hours
+    requires_signal: emergency_247_claim
+    template: "I saw {name} offers emergency service, so when someone's power goes out at night and you're mid-job, who answers?"
+  - id: leave_a_message
+    requires_signal: leave_message_text
+    template: "Your site asks callers to leave a message, and a lot of people with an urgent electrical problem won't wait for a call back."
+  - id: phone_only
+    requires_signal: phone_only_booking
+    template: "It looks like the only way to book {name} is by phone, so every call you miss on a job is a quote you don't get to give."
+
+open_questions:
+  - "No niche knowledge file exists for electrical in the main app; needed before the AI receptionist sells here."
+  - "Value weight 0.70 is a guess."

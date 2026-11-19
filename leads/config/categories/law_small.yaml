@@ -1,0 +1,99 @@
+# Small law firms: personal injury, family, criminal defense. Spec rank 6.
+slug: law_small
+label: Small law firms (PI, family, criminal defense)
+rank: 6
+pilot_phase: null
+niche_knowledge_slug: null
+value_weight: 0.95
+why_converts:
+  - "Each new client is worth thousands (PI cases often far more), so one saved call pays for a year."
+  - "Callers in a crisis (arrest, accident, divorce) don't leave voicemail; they call the next firm."
+  - "Many urgent calls come evenings and weekends."
+
+source_codes:
+  status: unconfirmed
+  overture: [lawyer, personal_injury_law, family_practice_law, divorce_and_family_law, criminal_defense_law, dui_law]
+  osm: ["office=lawyer"]
+  note: "OSM office=lawyer rarely carries practice area; classify practice area from the website in Stage 2."
+
+subcategories:
+  - {slug: personal_injury, label: Personal injury, include: true}
+  - {slug: family_law, label: Family/divorce, include: true}
+  - {slug: criminal_defense, label: Criminal defense / DUI, include: true}
+  - {slug: immigration, label: Immigration, include: false, reason: "Not in spec; OPEN QUESTION."}
+  - {slug: estate_planning, label: Estate planning, include: false, reason: "Not in spec; less urgent. OPEN QUESTION."}
+  - {slug: corporate, label: Corporate/large firm, include: false, reason: "Not a small-business buyer."}
+
+pain_keywords:
+  - free consultation
+  - call now
+  - call today
+  - available 24/7
+  - 24/7
+  - evenings and weekends
+  - leave a message
+  - we'll call you back
+  - we will return your call
+  - arrested
+  - injured
+
+review_pain_keywords:
+  - never answers
+  - never returned my call
+  - never called back
+  - went to voicemail
+  - voicemail
+  - couldn't get through
+  - couldn't reach
+  - hard to reach
+  - called multiple times
+
+negative_keywords:
+  - intake team available 24/7
+  - legal intake center
+
+exclusions:
+  # SEED LIST, INCOMPLETE. Big advertising PI firms and legal-services platforms.
+  chain_name_patterns:
+    - morgan & morgan
+    - morgan and morgan
+    - jacoby & meyers
+    - legalzoom
+    - rocket lawyer
+    - legalshield
+  keywords:
+    - legal aid
+    - public defender
+    - law school
+    - attorney general
+    - district attorney
+    - lawyer referral service
+  note: "Legal aid, government offices and referral services are not buyers."
+
+staff_target: {min: 1, typical: 4, max: 15, hard_max: 30}
+
+best_call_windows:
+  - days: [tue, wed, thu]
+    start: "08:00"
+    end: "09:30"
+    why: "Before court and client meetings."
+  - days: [mon, tue, wed, thu]
+    start: "16:00"
+    end: "17:30"
+    why: "After court."
+
+opener_templates:
+  - id: after_hours
+    requires_signal: emergency_247_claim
+    template: "I saw {name} says you're available 24/7, so when someone calls from a police station at midnight, who answers?"
+  - id: leave_a_message
+    requires_signal: leave_message_text
+    template: "Your site asks callers to leave a message, and someone who was just in an accident usually calls the next firm instead."
+  - id: hard_to_reach_reviews
+    requires_signal: review_hard_to_reach
+    template: "A couple of reviews for {name} mention calls not being returned, and we make sure every caller gets a live answer."
+
+open_questions:
+  - "Include immigration and estate planning? Currently excluded per spec."
+  - "AI intake for law firms touches attorney-client privilege and unauthorized-practice rules: can the receptionist qualify cases, or only take messages?"
+  - "No law niche knowledge file in the main app yet."

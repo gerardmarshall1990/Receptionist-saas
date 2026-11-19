@@ -1,0 +1,100 @@
+# HVAC. Spec rank 2, pilot phase (a).
+slug: hvac
+label: HVAC
+rank: 2
+pilot_phase: a
+niche_knowledge_slug: hvac   # knowledge/niches/hvac.json in the main app
+value_weight: 0.85
+why_converts:
+  - "Seasonal spikes (heat waves, cold snaps) swamp the phone exactly when demand peaks."
+  - "No-heat/no-cooling calls are urgent; callers move to the next company fast."
+  - "Installs and replacements are high-ticket ($5k-$15k+), so one saved lead covers months."
+
+source_codes:
+  status: unconfirmed
+  overture: [hvac_services, heating_and_air_conditioning, air_duct_cleaning_service]
+  osm: ["craft=hvac"]
+  note: "Overture codes from memory; verify in Stage 1. OSM craft=hvac is sparse in the US."
+
+subcategories:
+  - {slug: residential_hvac, label: Residential HVAC, include: true}
+  - {slug: commercial_hvac, label: Commercial HVAC, include: true, reason: "Include, but larger firms often have dispatch; staff caps apply."}
+  - {slug: duct_cleaning, label: Duct cleaning only, include: false, reason: "Lower ticket, not urgent; revisit with data."}
+  - {slug: hvac_supply, label: HVAC supply/distributor, include: false, reason: "Shop/distributor, not a service business."}
+
+pain_keywords:
+  - 24/7
+  - 24 hour
+  - emergency service
+  - emergency repair
+  - no heat
+  - no ac
+  - no cooling
+  - after hours
+  - leave a message
+  - we'll call you back
+  - call for a free estimate
+  - call now
+  - same day service
+
+review_pain_keywords:
+  - never answers
+  - went to voicemail
+  - voicemail
+  - couldn't get through
+  - called multiple times
+  - hard to reach
+  - never called back
+  - didn't call back
+  - no one answered
+
+negative_keywords:
+  - live dispatcher 24/7
+  - our dispatchers answer 24/7
+
+exclusions:
+  # SEED LIST, INCOMPLETE.
+  chain_name_patterns:
+    - one hour heating & air
+    - one hour heating and air
+    - aire serv
+    - service experts
+    - ars rescue rooter
+    - home depot
+    - sears home services
+  keywords:
+    - hvac supply
+    - supply house
+    - distributor
+    - wholesale
+  note: "Manufacturer-branded dealers (e.g. 'Carrier dealer') are usually independent and are NOT excluded."
+
+staff_target: {min: 2, typical: 6, max: 20, hard_max: 50}
+
+best_call_windows:
+  - days: [mon, tue, wed, thu, fri]
+    start: "08:00"
+    end: "09:00"
+    why: "Before techs roll; owner/office manager planning the day."
+  - days: [mon, tue, wed, thu, fri]
+    start: "15:30"
+    end: "17:30"
+    why: "After the midday rush of service calls."
+
+opener_templates:
+  - id: emergency_after_hours
+    requires_signal: emergency_247_claim
+    template: "I saw {name} offers emergency service, so on the hottest night of the summer, who answers when your techs are all out?"
+  - id: leave_a_message
+    requires_signal: leave_message_text
+    template: "Your site asks callers to leave a message, and in a heat wave most people just call the next company."
+  - id: hiring_front_desk
+    requires_signal: hiring_receptionist
+    template: "I noticed {name} is hiring for the phones, and we can answer every call from day one while you hire."
+  - id: limited_hours
+    requires_signal: limited_hours_text
+    template: "Your hours show you're closed {evidence}, which is often when no-heat and no-cooling calls come in."
+
+open_questions:
+  - "Should outreach pause during regional heat waves/cold snaps (owners slammed) or prioritize them (pain highest)? Test both."
+  - "Commercial-only HVAC firms: include in pilot or not?"

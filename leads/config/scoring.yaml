@@ -1,0 +1,50 @@
+# Scoring rules (spec section 5). These are STARTING GUESSES; Stage 8 refits
+# them from outcomes. Bump `version` on any change.
+version: 1
+
+# Total = 0.35*pain + 0.25*value + 0.25*reachability + 0.15*fit (each 0-100).
+weights:
+  pain: 0.35
+  value: 0.25
+  reachability: 0.25
+  fit: 0.15
+
+# A >= 80, B 60-79, C 40-59, D < 40.
+tiers:
+  A: 80
+  B: 60
+  C: 40
+
+# Zero in either of these means the lead is dead regardless of pain.
+zero_kills: [reachability, fit]
+
+# Funnel widths (spec section 2), as fractions of the pre-scored universe.
+llm_top_fraction: 0.10        # T3 LLM scoring
+paid_verify_top_fraction: 0.025  # T4 paid phone/email verification
+opener_top_fraction: 0.015    # T5 openers
+
+# Rule-based pre-score weights, per signal, within its dimension. Normalized to
+# 0-100 per dimension at scoring time. Disqualifiers (uses_answering_service,
+# is_chain, staff_too_large) are gates, not weights, and are rejected here.
+signal_weights:
+  # pain
+  phone_only_booking: 3
+  no_online_booking: 2
+  no_chat_widget: 1
+  single_phone_number: 2
+  leave_message_text: 3
+  limited_hours_text: 2
+  emergency_247_claim: 3
+  hiring_receptionist: 4
+  review_hard_to_reach: 5
+  # value (category value_weight is applied on top)
+  pricing_hints: 1
+  multiple_locations: 1
+  # fit
+  website_works: 2
+  owner_operated: 3
+  staff_in_range: 3
+  # reachability
+  phone_verified: 5
+  email_valid: 2
+  owner_name_public: 2

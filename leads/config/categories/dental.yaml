@@ -1,0 +1,118 @@
+# Dental practices. Spec rank 5, pilot phase (b).
+slug: dental
+label: Dental practices
+rank: 5
+pilot_phase: b
+niche_knowledge_slug: null   # main app has no dental niche file yet
+value_weight: 0.85
+why_converts:
+  - "New-patient calls are missed at lunch, after hours, and when the front desk is with a patient."
+  - "A new patient is worth thousands over their lifetime, so one saved call covers the price."
+  - "Front desks are overloaded with insurance, check-in and recalls."
+
+source_codes:
+  status: unconfirmed
+  overture: [dentist, general_dentistry, cosmetic_dentist, pediatric_dentist, orthodontist, endodontist, periodontist, oral_surgeon, emergency_dentist]
+  osm: ["amenity=dentist", "healthcare=dentist"]
+  note: "Verify Overture codes in Stage 1."
+
+subcategories:
+  - {slug: general_dentistry, label: General dentistry, include: true}
+  - {slug: cosmetic_dentistry, label: Cosmetic dentistry, include: true}
+  - {slug: pediatric_dentistry, label: Pediatric dentistry, include: true}
+  - {slug: orthodontics, label: Orthodontics, include: true}
+  - {slug: specialists, label: Endo/perio/oral surgery, include: true, reason: "Referral-driven; test separately."}
+  - {slug: dental_lab, label: Dental lab, include: false, reason: "No patient calls."}
+  - {slug: dso_owned, label: DSO-owned practice, include: false, reason: "Chain; decisions made centrally."}
+
+pain_keywords:
+  - new patients welcome
+  - accepting new patients
+  - call to schedule
+  - call to book
+  - call our office
+  - leave a message
+  - we'll call you back
+  - closed for lunch
+  - closed fridays
+  - emergency appointments
+  - same day emergency
+
+review_pain_keywords:
+  - never answers
+  - went to voicemail
+  - voicemail
+  - couldn't get through
+  - on hold
+  - put on hold
+  - called multiple times
+  - hard to reach
+  - never called back
+  - front desk never
+
+negative_keywords:
+  - dental answering service
+  - our call center
+
+exclusions:
+  # SEED LIST, INCOMPLETE. DSOs often keep the original practice name, so the
+  # name list only catches branded ones; Stage 2 should also look for DSO
+  # footers ("a member of ...", "supported by ...").
+  chain_name_patterns:
+    - aspen dental
+    - heartland dental
+    - pacific dental services
+    - western dental
+    - coast dental
+    - gentle dental
+    - comfort dental
+    - castle dental
+    - monarch dental
+    - bright now! dental
+    - brightnow dental
+    - kool smiles
+    - great expressions
+    - ideal dental
+    - smile brands
+    - perfect teeth
+    - risas dental
+    - midwest dental
+  keywords:
+    - dental lab
+    - dental laboratory
+    - dental supply
+    - school of dentistry
+    - dental school
+  note: ""
+
+staff_target: {min: 3, typical: 8, max: 20, hard_max: 40}
+
+best_call_windows:
+  - days: [tue, wed, thu]
+    start: "10:00"
+    end: "11:30"
+    why: "After morning check-ins, before lunch; avoid Monday backlog."
+  - days: [tue, wed, thu]
+    start: "14:00"
+    end: "16:00"
+    why: "Mid-afternoon lull."
+
+opener_templates:
+  - id: lunch_closure
+    requires_signal: limited_hours_text
+    template: "I noticed {name} is closed {evidence}, which is when a lot of new patients call to book."
+  - id: leave_a_message
+    requires_signal: leave_message_text
+    template: "Your site asks patients to leave a message, and new patients usually call the next office rather than wait."
+  - id: phone_only
+    requires_signal: phone_only_booking
+    template: "It looks like new patients can only book {name} by phone, so every call during a busy check-in is at risk."
+  - id: hold_reviews
+    requires_signal: review_hard_to_reach
+    template: "A few reviews for {name} mention long holds or not getting through, and we make sure every call gets answered."
+
+open_questions:
+  - "Decision-maker is often the office manager, not the dentist: is that who we target?"
+  - "HIPAA: an AI receptionist taking patient details needs a BAA. Is the product ready for dental before we export these leads?"
+  - "No dental niche knowledge file in the main app yet."
+  - "Many dental offices already use phone systems with online scheduling (e.g. practice-management add-ons); does that reduce pain enough to down-score?"
