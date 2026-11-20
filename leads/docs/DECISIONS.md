@@ -2,6 +2,18 @@
 
 Newest first. One entry per decision that someone might later ask "why?" about.
 
+## 2026-11-20 — Stage 4 (rule-based scoring)
+
+- **Rules only, no LLM yet** (user chose; the T3 LLM check needs an Anthropic key in an env var). $0 per record,
+  233,798 businesses scored in ~75 s; scales linearly to 3M.
+- **Precision gate passed** before weighting: fresh blind sample of v5 hits, every signal >= 89% (hiring 8/9,
+  everything else 100% in the sample; leave_message 45/46 from the full review).
+- **Weights follow evidence strength**: voicemail-on-own-site 10, hiring front desk 8, phone-only booking 6,
+  limited hours 3, single number 2, 24/7 claim 2, no booking / no chat 1 (those are on 50-80% of sites).
+- **Tier A cut-off 80 -> 70** after measuring: 95th percentile total among crawled pilot leads = 69.7, so the
+  spec default put only 0.8% in A. A >= 70 is ~top 5%. Refit all cut-offs from outcomes in Stage 8.
+- **Every score is explainable:** `scores.components` lists every point added or removed.
+
 ## 2026-11-19 — Stage 3 redirected: no paid phone lookups; live Google reviews instead
 
 - **No Twilio (user decision).** Phones stay at `likely` at best (Overture + own website agree). Consequence:

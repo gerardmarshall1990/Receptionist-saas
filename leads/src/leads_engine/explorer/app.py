@@ -375,6 +375,11 @@ def create_app(
                 " where business_id = %s order by weight desc, id",
                 (lead_id,),
             ).fetchall()
+            score_row = c.execute(
+                "select pain, value, reachability, fit, total, tier, dead_reason, components,"
+                " model_version from scores where business_id = %s",
+                (lead_id,),
+            ).fetchone()
             signal_rows = c.execute(
                 "select signal, value, count, evidence, source_url, extractor_version from signals"
                 " where business_id = %s order by value desc, signal",
@@ -396,6 +401,7 @@ def create_app(
             "emails": emails,
             "reasons": [{k: _jsonable(v) for k, v in r.items()} for r in reasons],
             "signals": signal_rows,
+            "score": {k: _jsonable(v) for k, v in score_row.items()} if score_row else None,
             "facts": fx.facts_for(b, phones, emails),
             "suppression": supp,
             "local_time": lt.strftime("%a %H:%M") if lt else None,

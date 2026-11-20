@@ -29,6 +29,16 @@ counted as voicemail; fixed. Then **every** `leave_message_text` hit in the pilo
 **45/46 (98%)**. The one miss is a patient review where the *dentist* left the voicemail.
 The other signals have not had a blind review on v4/v5; do one before Stage 4 uses the weights.
 
+**Stage 4 precision gate (v5, fresh blind sample):** every signal >= 89% (hiring 8/9, the rest 100% in the
+sample). Passed, so all of them are used for scoring.
+
+**v6 (after the Stage 4 50-lead review):** 2 of ~150 reasons on A-tier leads were wrong. Both are fixed and both
+are regression tests:
+- `pricing_hints` fired on a story ("bought a $500 van"). A price must now follow the price keyword directly
+  ("starting at $89", "only $49"), not just appear somewhere nearby.
+- `leave_message_text` fired on a patient review where the *dentist* left the voicemail. Wording where the
+  business leaves the message now counts as the opposite of the signal.
+
 ## What the reviews taught (for scoring)
 
 - **`emergency_247_claim` is true for ~half of all trade websites.** It is accurate but barely separates leads.

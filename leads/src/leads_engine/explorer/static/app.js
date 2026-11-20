@@ -359,10 +359,25 @@ function renderDetail(d) {
     body.push(el("div", { class: "banner banner-bad" }, `Suppressed (${d.suppression.length} rule${d.suppression.length > 1 ? "s" : ""}): ${d.suppression[0].reason}. Never contact.`));
   }
 
+  if (d.score) {
+    const s = d.score;
+    const dims = [["Pain", s.pain], ["Value", s.value], ["Reachability", s.reachability], ["Fit", s.fit]];
+    body.push(el("section", { class: "dsec" },
+      el("h3", {}, "Score"),
+      el("div", { class: "scoreline" },
+        s.dead_reason ? el("span", { class: "pill pill-bad" }, s.dead_reason)
+          : el("span", {}, el("span", { class: `tier tier-${s.tier}` }, s.tier), " ", el("strong", {}, String(Math.round(s.total)))),
+        ...dims.map(([k, v]) => el("span", { class: "muted small" }, `${k} ${Math.round(v)}`))),
+      el("details", {}, el("summary", { class: "small" }, "How this score was built"),
+        el("ul", { class: "facts" }, (s.components || []).map((c) =>
+          el("li", {}, el("span", { class: "mono" }, `${c.points > 0 ? "+" : ""}${c.points}`), el("span", { class: "muted small" }, c.dimension), el("span", {}, c.item.replaceAll("_", " "))))),
+        el("p", { class: "muted small" }, `Model ${s.model_version}. Total = 0.35 pain + 0.25 value + 0.25 reachability + 0.15 fit.`))));
+  }
+
   // Why this lead: evidence-backed reasons only (Stage 2+). Never invented.
   const why = el("div", { class: "why" }, el("h3", {}, "Why this lead"));
   if (d.reasons.length) {
-    for (const r of d.reasons) {
+    for (const r of d.reasons.slice(0, 3)) {
       const src = r.source_url && safeUrl(r.source_url);
       why.append(el("div", { class: "reason" },
         el("div", {}, el("span", { class: "pill pill-accent" }, r.dimension), " ", el("strong", {}, r.signal.replaceAll("_", " "))),
@@ -373,6 +388,7 @@ function renderDetail(d) {
     why.append(el("p", { class: "muted small" },
       "No evidence collected yet. Pain signals (e.g. “leave a message”, phone-only booking, 24/7 claims, review complaints) are added by the website crawl in Stage 2, each with the quoted text and the page it came from."));
   }
+  if (d.reasons.length > 3) why.append(el("p", { class: "muted small" }, `${d.reasons.length - 3} more in "Signals found on their website" below.`));
   body.push(why);
 
   if (d.signals && d.signals.length) {

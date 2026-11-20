@@ -79,7 +79,8 @@ def test_spec_scoring_formula_and_tiers() -> None:
     )
     assert sc.total(100, 100, 100, 100) == pytest.approx(100)
     assert sc.total(80, 60, 40, 20) == pytest.approx(0.35 * 80 + 0.25 * 60 + 0.25 * 40 + 0.15 * 20)
-    assert [sc.tier_for(x) for x in (80, 79.99, 60, 59.99, 40, 39.99, 0)] == list("ABBCCDD")
+    # A moved 80 -> 70 in scoring v3 from the pilot's percentiles (DECISIONS 2026-11-20).
+    assert [sc.tier_for(x) for x in (70, 69.99, 60, 59.99, 40, 39.99, 0)] == list("ABBCCDD")
 
 
 def test_zero_reachability_or_fit_kills_the_lead_regardless_of_pain() -> None:

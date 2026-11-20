@@ -1,6 +1,6 @@
 # Scoring rules (spec section 5). These are STARTING GUESSES; Stage 8 refits
 # them from outcomes. Bump `version` on any change.
-version: 1
+version: 3
 
 # Total = 0.35*pain + 0.25*value + 0.25*reachability + 0.15*fit (each 0-100).
 weights:
@@ -9,9 +9,11 @@ weights:
   reachability: 0.25
   fit: 0.15
 
-# A >= 80, B 60-79, C 40-59, D < 40.
+# Spec default was A >= 80. On the pilot's crawled leads the 95th percentile total is
+# 69.7, so A >= 80 held only 0.8% (122 leads): too few for the Stage 6 call test.
+# A >= 70 = roughly the top 5%. B and C as in the spec. Refit from outcomes (Stage 8).
 tiers:
-  A: 80
+  A: 70
   B: 60
   C: 40
 
@@ -23,28 +25,46 @@ llm_top_fraction: 0.10        # T3 LLM scoring
 paid_verify_top_fraction: 0.025  # T4 paid phone/email verification
 opener_top_fraction: 0.015    # T5 openers
 
-# Rule-based pre-score weights, per signal, within its dimension. Normalized to
-# 0-100 per dimension at scoring time. Disqualifiers (uses_answering_service,
-# is_chain, staff_too_large) are gates, not weights, and are rejected here.
+# Rule-based pre-score (Stage 4). Points per signal within its dimension. Strength =
+# how directly the evidence shows missed/unanswered calls x its measured precision
+# (docs/reports/stage2-precision.md). Signals on most sites (no booking, no chat,
+# 24/7) get low points so they don't flatten the ranking. Disqualifiers
+# (uses_answering_service, is_chain, staff_too_large) are gates, not weights.
 signal_weights:
   # pain
-  phone_only_booking: 3
-  no_online_booking: 2
-  no_chat_widget: 1
+  leave_message_text: 10     # their own site says callers reach voicemail (98% precise)
+  review_hard_to_reach: 10   # reserved: review complaints (not collected; see DECISIONS)
+  hiring_receptionist: 8     # paying for a human to answer phones
+  phone_only_booking: 6
+  limited_hours_text: 3
   single_phone_number: 2
-  leave_message_text: 3
-  limited_hours_text: 2
-  emergency_247_claim: 3
-  hiring_receptionist: 4
-  review_hard_to_reach: 5
-  # value (category value_weight is applied on top)
-  pricing_hints: 1
-  multiple_locations: 1
+  emergency_247_claim: 2     # on ~half of trade sites: accurate but weakly separating
+  no_online_booking: 1       # on ~50% of sites
+  no_chat_widget: 1          # on ~80% of sites
+  # value (added to category value_weight x value_base_scale)
+  pricing_hints: 10
+  multiple_locations: 15
   # fit
-  website_works: 2
-  owner_operated: 3
-  staff_in_range: 3
+  website_works: 0           # handled by fit bases below
+  owner_operated: 25
+  staff_in_range: 0          # staff size not collected yet
   # reachability
-  phone_verified: 5
-  email_valid: 2
-  owner_name_public: 2
+  phone_verified: 0          # handled by phone_status points below
+  email_valid: 0             # handled by email points below
+  owner_name_public: 0       # not collected (privacy, precision)
+
+prescore:
+  pain_full_at: 12           # pain points that make pain = 100
+  value_base_scale: 80       # category value_weight (0-1) x this
+  phone_points: {verified: 85, likely: 70, unverified: 45, invalid: 0, none: 0}
+  email_points: {site_found: 15, valid: 15, risky: 5, source_listed: 5, invalid: 0, none: 0}
+  reachability_penalties: {phone_not_on_site: 15, shared_phone: 10}
+  fit_base: {site_works: 55, site_unknown: 45, no_site: 35}
+  fit_penalties:
+    promises_live_answer: 30
+    website_mismatch: 25
+    name_repeated_review: 15
+    generic_name: 10
+    thin_homepage: 5
+  # Any of these flags = fit 0 = dead lead (spec: answering service/chains excluded).
+  disqualifying_flags: [uses_answering_service, franchise_disclaimer, website_parked]

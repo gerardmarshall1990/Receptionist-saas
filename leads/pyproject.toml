@@ -60,6 +60,7 @@ ignore = []
 "src/leads_engine/crawl/extract.py" = ["E501"]
 "src/leads_engine/crawl/report.py" = ["E501"]
 "src/leads_engine/crawl/store.py" = ["E501"]
+"src/leads_engine/scoring/run.py" = ["E501"]
 
 [tool.mypy]
 python_version = "3.12"

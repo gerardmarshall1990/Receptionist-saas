@@ -20,7 +20,9 @@ from leads_engine.universe import normalize as nz
 
 # v4: competitor context ignored, a form = online channel, franchise wording must be about them.
 # v5: "leave your name and number below" (a web form) is not voicemail.
-EXTRACTOR_VERSION = "stage2-v5"
+EXTRACTOR_VERSION = (
+    "stage2-v6"  # v6: price must follow its keyword; business-left voicemail ignored
+)
 SNIPPET = 300
 
 
@@ -75,6 +77,8 @@ ONLINE_FORM = _rx(
 LEAVE_MESSAGE_NOT = _rx(
     # A web form, not a phone line: "leave your name and number below", "Submit".
     r"\bbelow\b",
+    # The business called the customer ("Doctor called next day... he left a voice mail").
+    r"\b(?:he|she|they|doctor|dr\.?|office|staff) left (?:me |us )?(?:a )?voice ?mail",
     r"\bform\b",
     r"\bsubmit\b",
     r"automatic (?:telephone|phone) dialing",
@@ -151,7 +155,9 @@ FRANCHISE = _rx(
     r"(?:over |more than )?\d{2,}\+? (?:locations|offices|branches) (?:nationwide|across (?:the )?(?:us|u\.s\.|country|america))",
 )  # fmt: skip
 PRICING = _rx(
-    r"(?:starting at|starts at|from|only|just|flat[- ]rate|special|coupon|price)\D{0,20}\$\s?\d{2,5}",
+    # The price must follow the keyword directly ("from $99", "starting at just $150"); v5 allowed 20
+    # characters in between and matched stories ("...from that job funded a $500 van").
+    r"(?:starting at|starts at|from|only|just|flat[- ]rate|special|coupon|price)[\s:]{0,3}(?:just |only )?\$\s?\d{2,5}(?![\d,])",
     r"\$\s?\d{2,5}(?:\.\d\d)?\s*(?:off|special|flat rate|service call|diagnostic|exam|cleaning)",
 )  # fmt: skip
 MULTI_LOCATION = _rx(

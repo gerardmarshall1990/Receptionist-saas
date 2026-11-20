@@ -98,6 +98,22 @@ def _ui_bench(args: argparse.Namespace) -> int:
     return 0
 
 
+def _score_run(args: argparse.Namespace) -> int:
+    from leads_engine.runs import recorded_run
+    from leads_engine.scoring import run as scoring
+
+    s = get_settings()
+    cfg = load_config(s.config_dir)
+    params = {"model": scoring.model_version(cfg)}
+    with recorded_run(
+        s.database_url, "stage4.score", cfg.config_hash,
+        dry_run=False, budget_usd=s.run_budget_usd, params=params,
+    ) as run:  # fmt: skip
+        run.counts = scoring.run(s.database_url, cfg)
+    print(f"score: {run.counts}")
+    return 0
+
+
 def _db_migrate(args: argparse.Namespace) -> int:
     applied = db.migrate(get_settings().database_url)
     get_logger("cli").info("migrations_applied", applied=applied)
@@ -110,6 +126,7 @@ COMMANDS: dict[tuple[str, str], Callable[[argparse.Namespace], int]] = {
     ("db", "check"): _db_check,
     ("db", "migrate"): _db_migrate,
     ("ui", "serve"): _ui_serve,
+    ("score", "run"): _score_run,
     ("ui", "bench"): _ui_bench,
     **universe_commands.COMMANDS,
     **crawl_commands.COMMANDS,
@@ -126,6 +143,10 @@ def build_parser() -> argparse.ArgumentParser:
     dbp.add_parser("migrate", help="apply pending migrations")
     universe_commands.add_parser(groups)
     crawl_commands.add_parser(groups)
+    sp = groups.add_parser("score", help="Stage 4: rule-based pre-score").add_subparsers(
+        dest="command", required=True
+    )
+    sp.add_parser("run", help="score every business (rules only, $0)")
     uip = groups.add_parser("ui", help="lead explorer web UI").add_subparsers(
         dest="command", required=True
     )

@@ -22,9 +22,10 @@ Read first: `docs/MASTER-SPEC.md` (the spec), `docs/ICP.md` (who we target), `do
 One stage at a time (spec §9): explore -> plan -> **wait for approval** -> implement with tests -> verify -> report
 (done / tested / untested / gaps / open questions) -> **wait for "verified"**. Commit after each green stage. Ask before adding scope.
 
-Current status: **Stage 2 (crawl + signals, pilot) in review**. Stages 0, 1, 1b verified.
-Reports: `docs/reports/stage1-pilot-*.md`, `docs/reports/explorer-benchmark.md`, `docs/reports/stage2-crawl-pilot.md`,
-`docs/reports/stage2-precision.md`. Next: Stage 3 verification (T2/T4) plan.
+Current status: **Stage 4 (rule-based scoring) in review**. Stages 0, 1, 1b, 2 verified; Stage 3 redirected
+(no paid phone lookups; live Google reviews panel in the explorer).
+Reports: `docs/reports/stage1-pilot-*.md`, `explorer-benchmark.md`, `stage2-crawl-pilot.md`, `stage2-precision.md`,
+`stage4-scoring-pilot.md`. Next: Stage 5 (compliance gate + export) plan.
 
 ## Commands
 
@@ -74,6 +75,9 @@ uv run leads crawl status
 uv run leads crawl extract       # no network: re-run after changing extract.py rules
 uv run leads crawl report        # docs/reports/stage2-crawl-pilot.md (incl. 100-hit review sample)
 
+# Stage 4: rule-based score (Pain x Value x Reachability x Fit) from stored signals ($0, idempotent)
+uv run leads score run           # writes scores (+ itemised components) and businesses.score/tier
+
 # browser test (needs node + playwright; runs inside pytest when TEST_DATABASE_URL is set)
 LEADS_E2E_SCREENSHOTS=/some/dir uv run pytest tests/test_explorer_e2e.py -s
 ```
@@ -92,7 +96,7 @@ One-liner before every commit:
 ```
 config/global.yaml            release pin, calling-hours guard rail, exclusions, vendor names, chain/dedupe
                               thresholds, directory/platform domains, pilot sample sizes, watch list
-config/scoring.yaml           dimension weights, tiers, funnel fractions, signal weights
+config/scoring.yaml           dimension weights, tiers, funnel fractions, signal weights, prescore points
 config/models.yaml            LLM model names, effort, prices, token estimates (cost projection)
 config/categories/*.yaml      one file per category (file name == slug)
 src/leads_engine/settings.py  env-based runtime settings (LEADS_* vars, .env)
@@ -106,6 +110,7 @@ src/leads_engine/crawl/       fetcher.py (one site, politeness), runner.py (queu
                               html.py (parse), extract.py (signal rules), store.py (DB writes), report.py
 src/leads_engine/explorer/    app.py (FastAPI API + auth/CSP), queries.py (whitelisted SQL, keyset paging),
                               facts.py (Stage 1 facts, call windows), bench.py, static/ (no-build UI)
+src/leads_engine/scoring/     prescore.py (pure score + components), run.py (stream, COPY, MERGE)
 src/leads_engine/universe/    overture.py (remote read), normalize.py (pure), build.py (exclude/chain/dedupe/
                               sample), load.py (Postgres upsert), report.py, pipeline.py (paths + steps)
 migrations/NNN_*.sql          applied in order, each in a transaction, tracked in schema_migrations

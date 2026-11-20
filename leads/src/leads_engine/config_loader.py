@@ -152,6 +152,34 @@ class TierCutoffs(Strict):
         return self
 
 
+Points = Annotated[float, Field(ge=0, le=100)]
+PHONE_STATUSES = {"verified", "likely", "unverified", "invalid", "none"}
+EMAIL_STATUSES = {"site_found", "valid", "risky", "source_listed", "invalid", "none"}
+FIT_BASES = {"site_works", "site_unknown", "no_site"}
+
+
+class PreScore(Strict):
+    pain_full_at: Annotated[float, Field(gt=0)]
+    value_base_scale: Points
+    phone_points: dict[str, Points]
+    email_points: dict[str, Points]
+    reachability_penalties: dict[str, Points]
+    fit_base: dict[str, Points]
+    fit_penalties: dict[str, Points]
+    disqualifying_flags: list[str]
+
+    @model_validator(mode="after")
+    def _complete(self) -> Self:
+        for name, got, want in (
+            ("phone_points", set(self.phone_points), PHONE_STATUSES),
+            ("email_points", set(self.email_points), EMAIL_STATUSES),
+            ("fit_base", set(self.fit_base), FIT_BASES),
+        ):
+            if got != want:
+                raise ValueError(f"{name} must have exactly {sorted(want)}, got {sorted(got)}")
+        return self
+
+
 class ScoringConfig(Strict):
     version: int
     weights: DimensionWeights
@@ -162,6 +190,7 @@ class ScoringConfig(Strict):
     paid_verify_top_fraction: Annotated[float, Field(gt=0, le=0.10)]
     opener_top_fraction: Annotated[float, Field(gt=0, le=0.05)]
     signal_weights: dict[str, Annotated[float, Field(ge=0)]]
+    prescore: PreScore
 
     @field_validator("signal_weights")
     @classmethod

@@ -410,3 +410,26 @@ def test_name_and_number_below_is_a_form_not_voicemail() -> None:
     assert "leave_message_text" not in extract(_p(t), BIZ, CFG).signals
     t2 = "If you reach our voicemail, leave your name and number and we will call you back."
     assert extract(_p(t2), BIZ, CFG).signals["leave_message_text"].value
+
+
+# ------------------------------------- v6 regressions (Stage 4 hand review of 50 A-tier leads)
+
+
+def test_price_must_follow_its_keyword() -> None:
+    story = "KC completed a $400,000 project. The profit from that job funded a $500 van and tools."
+    assert "pricing_hints" not in extract(_p(story), BIZ, CFG).signals
+    for text in (
+        "Drain cleaning from $99 this month.",
+        "Tune-ups starting at just $150.",
+        "AC check for only $89.00.",
+    ):
+        assert extract(_p(text), BIZ, CFG).signals["pricing_hints"].value, text
+
+
+def test_voicemail_left_by_the_business_is_not_caller_voicemail() -> None:
+    review = "Procedure was painless. Doctor called next day to make sure everything was good. Missed call but he left a voice mail."
+    assert "leave_message_text" not in extract(_p(review), BIZ, CFG).signals
+    caller = (
+        "Left an after hours voicemail when the AC quit in the evening and they called back fast."
+    )
+    assert extract(_p(caller), BIZ, CFG).signals["leave_message_text"].value
