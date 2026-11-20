@@ -10,6 +10,7 @@ import time as _time
 from collections.abc import Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
+from dataclasses import asdict
 from decimal import Decimal
 from pathlib import Path
 from typing import Annotated, Any, Literal
@@ -24,6 +25,7 @@ from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
 from pydantic import BaseModel, Field
 
+from leads_engine.compliance import export as cx
 from leads_engine.config_loader import AppConfig
 from leads_engine.explorer import facts as fx
 from leads_engine.explorer import google as gx
@@ -135,6 +137,7 @@ def create_app(
         has_email: Tri | None = None,
         callable_now: bool = False,
         include_suppressed: bool = False,
+        compliance: Literal["pass", "blocked"] | None = None,
     ) -> qx.Filters:
         subs = {s.slug for c in cfg.categories.values() for s in c.subcategories}
         checks = (
@@ -162,6 +165,7 @@ def create_app(
             tier=tuple(tier), q=q, has_phone=_tri(has_phone), has_website=_tri(has_website),
             has_email=_tri(has_email), flags_any=tuple(flag), flags_none=tuple(not_flag),
             signals=tuple(signal), callable_now=callable_now, include_suppressed=include_suppressed,
+            compliance=compliance,
         )  # fmt: skip
 
     F = Annotated[qx.Filters, Depends(filters)]
@@ -242,8 +246,15 @@ def create_app(
             "signals": [{"key": k, "label": v} for k, v in qx.SIGNAL_FILTERS.items()],
             "sorts": [{"key": k, "label": s.label} for k, s in qx.SORTS.items()],
             "export": {
-                "enabled": False,
-                "why": "Export opens after the Stage 5 compliance gate (spec section 7).",
+                "enabled": True,
+                "max_rows": cfg.compliance.export.ui_max_rows,
+                "min_tier": cfg.compliance.export.min_tier,
+                "calling_mode": cfg.compliance.calling_mode,
+                "why": (
+                    "Exports only leads that pass the compliance gate, re-checked at export time"
+                    f" (tier {cfg.compliance.export.min_tier} or better, phone confirmed on their"
+                    " own site, not suppressed). Every export is recorded."
+                ),
             },
         }
 
@@ -385,6 +396,7 @@ def create_app(
                 " where business_id = %s order by value desc, signal",
                 (lead_id,),
             ).fetchall()
+            compliance = cx.gate_one(c, lead_id, cfg)
             supp = c.execute(
                 "select match_type, match_value, reason, source, created_at from suppression"
                 " where (match_type = 'business_id' and match_value = %s)"
@@ -407,6 +419,7 @@ def create_app(
             "local_time": lt.strftime("%a %H:%M") if lt else None,
             "callable_now": fx.callable_now(cat, b["tz"]),
             "category_label": cat.label if cat else b["category"],
+            "compliance": compliance,
         }
 
     places_holder: dict[str, gx.PlacesClient] = {}
@@ -480,6 +493,29 @@ def create_app(
             " Shown live from Google Maps; not stored.",
         }
 
+    @app.post("/api/export")
+    def export(f: F) -> Response:
+        """Gate the leads matching the current filters and download the passing ones as CSV."""
+        w = qx.build_where(f, cfg)
+        request = {k: v for k, v in asdict(f).items() if k not in {"suppressed", "callable_pairs"}}
+        res = cx.run_export(
+            settings.database_url, cfg, where=w.sql(), params=w.params, origin="explorer",
+            out_root=settings.data_dir / "exports", limit=cfg.compliance.export.ui_max_rows,
+            request=request,
+        )  # fmt: skip
+        log.info("explorer_export", export_id=res.export_id, **res.counts)
+        return Response(
+            cx.to_csv(res.records),
+            media_type="text/csv; charset=utf-8",
+            headers={
+                "Content-Disposition": f'attachment; filename="leads-{res.export_id[:8]}.csv"',
+                "X-Export-Id": res.export_id,
+                "X-Export-Passed": str(res.counts.get("pass", 0)),
+                "X-Export-Blocked": str(res.counts.get("blocked", 0)),
+                "Cache-Control": "no-store",
+            },
+        )
+
     @app.post("/api/leads/{lead_id}/suppress")
     def suppress(lead_id: UUID, body: SuppressIn) -> dict[str, Any]:
         # JSON-only is enforced in the middleware; the cookie is SameSite=Strict too.
@@ -509,6 +545,13 @@ def create_app(
                     (mt, mv, body.reason),
                 )
                 inserted += cur.rowcount
+            c.execute(
+                "update businesses set compliance_status = 'blocked',"
+                " compliance_blocks = array_append(compliance_blocks, 'suppressed')"
+                " where compliance_status = 'pass' and (id = %s or phone = any(%s)"
+                " or (%s and domain = %s))",
+                (lead_id, phones, body.include_domain, b["domain"]),
+            )
         agg_cache.clear()
         log.info(
             "suppressed",

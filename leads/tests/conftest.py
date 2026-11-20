@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import time
 import uuid
 from collections.abc import Callable, Iterator
 from pathlib import Path
@@ -69,5 +70,14 @@ def fresh_db() -> Iterator[str]:
     try:
         yield f"{base}/{name}"
     finally:
-        with psycopg.connect(TEST_URL, autocommit=True) as admin:
-            admin.execute(f'drop database if exists "{name}" with (force)')
+        # An autovacuum worker can hold the DB for a moment, and our non-superuser role
+        # may not terminate it: retry briefly instead of failing the test in teardown.
+        for attempt in range(20):
+            try:
+                with psycopg.connect(TEST_URL, autocommit=True) as admin:
+                    admin.execute(f'drop database if exists "{name}" with (force)')
+                break
+            except (psycopg.errors.InsufficientPrivilege, psycopg.errors.ObjectInUse):
+                if attempt == 19:
+                    raise
+                time.sleep(0.25)

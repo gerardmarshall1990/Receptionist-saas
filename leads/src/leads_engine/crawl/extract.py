@@ -20,9 +20,10 @@ from leads_engine.universe import normalize as nz
 
 # v4: competitor context ignored, a form = online channel, franchise wording must be about them.
 # v5: "leave your name and number below" (a web form) is not voicemail.
-EXTRACTOR_VERSION = (
-    "stage2-v6"  # v6: price must follow its keyword; business-left voicemail ignored
-)
+# v6: price must follow its keyword; business-left voicemail ignored.
+# v7: page text keeps element boundaries; text emails must end on a real TLD and must not
+#     start with glued phone/ZIP digits (dropped, never repaired).
+EXTRACTOR_VERSION = "stage2-v7"
 SNIPPET = 300
 
 
@@ -166,7 +167,12 @@ MULTI_LOCATION = _rx(
     r"multiple locations",
 )
 
-_EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9.-]+\.[A-Za-z]{2,24}")
+# Whole token only: no letters glued on either side ("info@x.comoffice" does not match).
+_EMAIL_RE = re.compile(
+    r"(?<![A-Za-z0-9._%+-])[A-Za-z0-9._%+-]{1,64}@(?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,24}(?![A-Za-z0-9-])"
+)
+# A phone tail or ZIP glued to the front of a text email: "664-2498info@", "60007emailinfo@".
+_GLUED_PREFIX = re.compile(r"^(?:[\d().+ -]*\d{3}[-.]\d{4}|\d{5,}[a-z])")
 _JUNK_EMAIL_DOMAINS = (
     "example.com", "domain.com", "email.com", "yourdomain.com", "yoursite.com", "sentry.io",
     "wixpress.com", "sentry-next.wixpress.com", "godaddy.com", "mysite.com", "test.com",
@@ -243,10 +249,17 @@ def _site_phones(pages: list[Page]) -> list[str]:
     return found
 
 
+def _plausible_text_email(e: str) -> bool:
+    """Emails read from page text (mailto links are trusted as written)."""
+    local, _, dom = e.lower().rpartition("@")
+    return nz.has_public_suffix(dom) and not _GLUED_PREFIX.search(local)
+
+
 def _site_emails(pages: list[Page]) -> list[tuple[str, str]]:
     out: dict[str, str] = {}
     for p in pages:
-        for raw in [*p.mailto, *_EMAIL_RE.findall(p.text)]:
+        text_found = [e for e in _EMAIL_RE.findall(p.text) if _plausible_text_email(e)]
+        for raw in [*p.mailto, *text_found]:
             e = raw.strip().strip(".,;:").lower()
             dom = e.rpartition("@")[2]
             if not e or _IMAGE_SUFFIX.search(e) or dom.endswith(_JUNK_EMAIL_DOMAINS):

@@ -2,6 +2,25 @@
 
 Newest first. One entry per decision that someone might later ask "why?" about.
 
+## 2026-11-20 — Stage 5 (compliance gate + export)
+
+User chose the recommended option on all four ("best, most efficient and purposeful"):
+- **Phone bar = `likely`** (listed by Overture AND on the business's own site). Nothing can reach `verified`
+  without a paid line-type lookup, which we don't do. Exported with `line_type: unknown`, stated honestly.
+- **Calling mode = human.** An AI-voice mode exists in `config/compliance.yaml`; switching to it blocks every
+  record whose line isn't a confirmed landline (FCC 2024: AI voices are "artificial voice" under the TCPA).
+- **Export = files + explorer download** (Parquet + CSV + manifest under `data/exports/`, audit rows in
+  `exports`/`export_items`). The main API has no `leads` table yet; adding one is a separate, cross-app change.
+- **Openers = $0 rule-based**: the category template for the lead's strongest stored reason. Templates that need
+  `{evidence}` are skipped (we never paraphrase evidence). No strong reason -> `opener: null`.
+- **DNC = recorded, not checked** (`dnc_unchecked` warning on every row). A switch makes it a block. The FTC
+  registry needs an org account; counsel decides.
+- Also blocked: shared phone, listed phone not on their site, website mismatch, toll-free/foreign/fake numbers,
+  emails not from their own site, unknown sources/licenses, any suppression match (re-read at write time).
+- **Extractor v7** (found in the export hand check): ~7% of site emails had phone digits or words glued on
+  ("664-2498info@x.com", "info@x.comoffice") because page text joined adjacent elements. Page text now keeps
+  element boundaries; text emails must be whole tokens on a real TLD. Bad matches are dropped, never repaired.
+
 ## 2026-11-20 — Stage 4 (rule-based scoring)
 
 - **Rules only, no LLM yet** (user chose; the T3 LLM check needs an Anthropic key in an env var). $0 per record,

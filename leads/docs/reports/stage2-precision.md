@@ -49,3 +49,9 @@ are regression tests:
   disqualified, but likely a harder sell. Track its conversion in Stage 6.
 - **Customer reviews on business sites are evidence too** ("left an after-hours voicemail"), but only when they
   describe *this* business, not a competitor.
+
+**v7 (Stage 5 export hand check):** emails only. ~7% of site emails had phone digits or words glued on
+("664-2498info@x.com", "info@x.comoffice") because page text joined adjacent HTML elements. Page text now keeps
+element boundaries; text emails must be whole tokens on a real TLD; bad matches are dropped, never repaired.
+Signal counts barely moved (e.g. leave_message_text 45, hiring_receptionist 147, phone_only_booking 286).
+

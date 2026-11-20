@@ -474,11 +474,52 @@ class CrawlConfig(Strict):
         return self
 
 
+# ---------------------------------------------------------------- compliance
+
+PHONE_RANK = {"verified": 3, "likely": 2, "unverified": 1, "invalid": 0, "none": 0}
+TIER_RANK = {"A": 4, "B": 3, "C": 2, "D": 1}
+CountryCode = Literal["US", "CA", "AU", "GB"]
+LineType = Literal["landline", "mobile", "voip"]
+
+
+class CountryRules(Strict):
+    enabled: bool
+    min_phone_status: Literal["verified", "likely", "unverified"]
+    require_dnc_check: bool
+    ai_voice_line_types: list[LineType]
+
+
+class ExportRules(Strict):
+    min_tier: Literal["A", "B", "C"]
+    min_reasons: Annotated[int, Field(ge=1)]
+    max_reasons: Annotated[int, Field(ge=1, le=5)]
+    ui_max_rows: Annotated[int, Field(ge=1, le=50_000)]
+    allowed_sources: list[str]
+    allowed_licenses: list[str]
+    blocked_phone_flags: list[str]
+    blocked_business_flags: list[str]
+
+    @model_validator(mode="after")
+    def _reasons(self) -> Self:
+        if self.max_reasons < self.min_reasons:
+            raise ValueError("max_reasons must be >= min_reasons")
+        return self
+
+
+class ComplianceConfig(Strict):
+    version: int
+    calling_mode: Literal["human", "ai_voice"]
+    export: ExportRules
+    countries: dict[CountryCode, CountryRules]
+    needs_counsel: list[str]
+
+
 class AppConfig(Strict):
     global_: GlobalConfig
     scoring: ScoringConfig
     models: ModelsConfig
     crawl: CrawlConfig
+    compliance: ComplianceConfig
     categories: dict[str, CategoryConfig]
     config_hash: str
 
@@ -508,6 +549,9 @@ class AppConfig(Strict):
             raise ValueError(
                 f"codes confirmed against another Overture release (re-run census): {stale}"
             )
+        on = {c for c, r in self.compliance.countries.items() if r.enabled}
+        if on - set(self.global_.countries_enabled):
+            raise ValueError(f"compliance enables countries not in global: {sorted(on)}")
         unknown = sorted(set(self.global_.pilot_sample) - set(self.categories))
         if unknown:
             raise ValueError(f"pilot_sample names unknown categories: {unknown}")
@@ -554,6 +598,7 @@ def load_config(config_dir: Path) -> AppConfig:
         "scoring": _read_yaml(config_dir / "scoring.yaml"),
         "models": _read_yaml(config_dir / "models.yaml"),
         "crawl": _read_yaml(config_dir / "crawl.yaml"),
+        "compliance": _read_yaml(config_dir / "compliance.yaml"),
         "categories": {},
     }
     categories: dict[str, CategoryConfig] = {}
@@ -572,6 +617,7 @@ def load_config(config_dir: Path) -> AppConfig:
         scoring=ScoringConfig.model_validate(raw["scoring"]),
         models=ModelsConfig.model_validate(raw["models"]),
         crawl=CrawlConfig.model_validate(raw["crawl"]),
+        compliance=ComplianceConfig.model_validate(raw["compliance"]),
         categories=categories,
         config_hash=_hash(raw),
     )

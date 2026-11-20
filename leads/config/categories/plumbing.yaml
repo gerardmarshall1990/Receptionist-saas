@@ -112,7 +112,8 @@ best_call_windows:
 opener_templates:
   - id: emergency_after_hours
     requires_signal: emergency_247_claim
-    template: "I saw {name} offers 24/7 emergency service, so when a call comes in at 2am while you're on another job, who picks it up?"
+    # The signal fires on "emergency service" with or without 24/7, so the opener claims only emergency service.
+    template: "I saw {name} offers emergency service, so when a call comes in at 2am while you're on another job, who picks it up?"
   - id: leave_a_message
     requires_signal: leave_message_text
     template: "Your site asks callers to leave a message, and I'm curious how many of them call the next plumber instead of waiting."

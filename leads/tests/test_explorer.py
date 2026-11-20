@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import csv
+import io
 import warnings
 from collections.abc import Iterator
 from datetime import UTC, datetime
@@ -12,6 +14,7 @@ import psycopg
 import pytest
 
 from leads_engine import db
+from leads_engine.compliance.export import check_all
 from leads_engine.config_loader import AppConfig, load_config
 from leads_engine.explorer import facts as fx
 from leads_engine.settings import Settings
@@ -55,7 +58,7 @@ def client(fresh_db: str, tmp_path: Path) -> Iterator[TestClient]:
     out = tmp_path / "built.parquet"
     build(tmp_path / "x", CFG, list(CFG.categories), "2026-11-18.0", out, "seed", rows_in=_rows())
     load(fresh_db, out, "all")
-    app = create_app(Settings(database_url=fresh_db), CFG)
+    app = create_app(Settings(database_url=fresh_db, data_dir=tmp_path), CFG)
     with TestClient(app) as c:
         yield c
     app.state.pool.close()
@@ -75,7 +78,7 @@ pytestmark = [pytest.mark.db, needs_db]
 def test_meta_and_default_list(client: TestClient) -> None:
     meta = client.get("/api/meta").json()
     assert meta["total"] == 9
-    assert meta["export"]["enabled"] is False
+    assert meta["export"]["enabled"] is True
     assert [c["slug"] for c in meta["categories"]][:2] == ["plumbing", "hvac"]
     body = client.get("/api/leads").json()
     assert len(body["items"]) == 9
@@ -318,3 +321,65 @@ def test_facts_only_restate_stored_fields() -> None:
     assert any("shared" in t.lower() for t in texts)
     assert any("yelp.com" in t for t in texts)
     assert {f["kind"] for f in out} <= {"value", "reachability", "caution", "info"}
+
+
+# ------------------------------------------------------------------ Stage 5 export
+
+
+def _make_exportable(fresh_db: str, lead: str) -> None:
+    with psycopg.connect(fresh_db, autocommit=True) as conn:
+        conn.execute("update phones set status = 'likely' where business_id = %s", (lead,))
+        conn.execute("update businesses set phone_status = 'likely' where id = %s", (lead,))
+        conn.execute(
+            "insert into scores (business_id, pain, value, reachability, fit, total, tier, components,"
+            " model_version) select id, 50, 50, 50, 50, case when id = %s then 80 else 30 end,"
+            " case when id = %s then 'A' else 'D' end, '[]', 'test' from businesses",
+            (lead, lead),
+        )
+        conn.execute(
+            "insert into reasons (business_id, signal, dimension, evidence, source_url, weight, stage)"
+            " values (%s, 'phone_only_booking', 'pain', 'Call us to book your appointment',"
+            " 'https://alphaplumbing.com/contact', 6, 'stage2')",
+            (lead,),
+        )
+    check_all(fresh_db, CFG)
+
+
+def test_export_downloads_only_gated_leads(client: TestClient, fresh_db: str) -> None:
+    lead = _id(client, "Alpha Plumbing")
+    _make_exportable(fresh_db, lead)
+
+    assert names(client.get("/api/leads?compliance=pass")) == ["Alpha Plumbing"]
+    assert "Alpha Plumbing" not in names(client.get("/api/leads?compliance=blocked&limit=200"))
+    assert client.get("/api/leads?compliance=maybe").status_code == 422
+    assert client.get("/api/meta").json()["export"]["enabled"] is True
+
+    d = client.get(f"/api/leads/{lead}").json()
+    assert d["compliance"]["status"] == "pass"
+    assert d["compliance"]["opener"].startswith("It looks like the only way to book Alpha Plumbing")
+    other = client.get(f"/api/leads/{_id(client, 'Charlie Pipes')}").json()
+    assert other["compliance"]["status"] == "blocked"
+
+    # JSON-only POST (CSRF guard), then a CSV of exactly the passing leads.
+    assert client.post(
+        "/api/export", content="x", headers={"content-type": "text/plain"}
+    ).status_code in (403, 415)
+    r = client.post("/api/export", json={})
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("text/csv")
+    assert r.headers["x-export-passed"] == "1"
+    rows = list(csv.DictReader(io.StringIO(r.text)))
+    assert [row["name"] for row in rows] == ["Alpha Plumbing"]
+    assert rows[0]["compliance_status"] == "pass"
+
+    # Suppressing the lead blocks it everywhere at once.
+    client.post(f"/api/leads/{lead}/suppress", json={"reason": "asked not to be called"})
+    assert names(client.get("/api/leads?compliance=pass&include_suppressed=true")) == []
+    assert client.post("/api/export", json={}).headers["x-export-passed"] == "0"
+    with psycopg.connect(fresh_db) as conn:
+        assert conn.execute(
+            "select origin, n_passed from exports order by created_at"
+        ).fetchall() == [
+            ("explorer", 1),
+            ("explorer", 0),
+        ]

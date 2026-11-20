@@ -34,7 +34,7 @@ function blankState() {
   return {
     category: [], subcategory: [], state: [], tier: [], flag: [], not_flag: [], signal: [],
     q: "", has_phone: "", has_website: "", has_email: "",
-    callable_now: false, include_suppressed: false, sort: "score", lead: "",
+    callable_now: false, include_suppressed: false, compliance: "", sort: "score", lead: "",
   };
 }
 
@@ -55,6 +55,7 @@ function readUrl() {
   s.q = p.get("q") || "";
   s.callable_now = p.get("callable_now") === "true";
   s.include_suppressed = p.get("include_suppressed") === "true";
+  s.compliance = ["pass", "blocked"].includes(p.get("compliance")) ? p.get("compliance") : "";
   s.sort = p.get("sort") || "score";
   s.lead = p.get("lead") || "";
   return s;
@@ -67,6 +68,7 @@ function filterParams() {
   if (state.q.trim()) p.set("q", state.q.trim());
   if (state.callable_now) p.set("callable_now", "true");
   if (state.include_suppressed) p.set("include_suppressed", "true");
+  if (state.compliance) p.set("compliance", state.compliance);
   return p;
 }
 
@@ -191,6 +193,12 @@ function renderFilters() {
     .sort((a, b) => (stateCounts.get(b) || 0) - (stateCounts.get(a) || 0) || a.localeCompare(b));
   renderChecklist($("#f-state"), "state", states.map((s) => ({ value: s, label: s })));
 
+  $("#f-compliance").replaceChildren(el("div", { class: "tri" }, el("span", {}, "Export gate"),
+    el("span", { class: "seg", role: "group", "aria-label": "Export gate" },
+      ...[["", "Any"], ["pass", "Passes"], ["blocked", "Blocked"]].map(([v, t]) =>
+        el("button", { type: "button", "aria-pressed": String(state.compliance === v),
+          onclick: () => { state.compliance = v; refresh(); } }, t)))));
+
   $("#f-callable").checked = state.callable_now;
   $("#f-suppressed").checked = state.include_suppressed;
   $("#q").value = state.q;
@@ -213,6 +221,7 @@ function renderActive() {
       `${state[k] === "yes" ? "Has" : "No"} ${label.toLowerCase()}`));
   }
   if (state.callable_now) chips.push(el("button", { type: "button", class: "chip", onclick: () => { state.callable_now = false; refresh(); } }, "Callable now"));
+  if (state.compliance) chips.push(el("button", { type: "button", class: "chip", onclick: () => { state.compliance = ""; refresh(); } }, state.compliance === "pass" ? "Passes export gate" : "Blocked by gate"));
   if (state.q.trim()) chips.push(el("button", { type: "button", class: "chip", onclick: () => { state.q = ""; refresh(); } }, `“${state.q.trim()}”`));
   $("#active").replaceChildren(...chips);
 }
@@ -276,7 +285,7 @@ function row(item) {
     el("td", { "data-label": "Email" }, emailPill(item.email_status)),
     el("td", { class: "num", "data-label": "Locations" }, item.location_count > 1 ? String(item.location_count) : "1"),
     el("td", { "data-label": "Flags" }, el("div", { class: "pills" }, flags)),
-    el("td", { class: "num", "data-label": "Score" }, item.tier
+    el("td", { class: "num", "data-label": "Score", title: item.compliance_status === "pass" ? "Passes the export gate" : "" }, item.tier
       ? el("span", {}, el("span", { class: `tier tier-${item.tier}` }, item.tier), " ", String(Math.round(item.score)))
       : el("span", { class: "muted", title: "Scoring arrives in Stage 4" }, "—")),
   );
@@ -349,6 +358,46 @@ function kv(pairs) {
 
 const FACT_PILL = { value: "pill-accent", reachability: "pill-good", caution: "pill-warn", info: "pill-muted" };
 
+const BLOCK_LABELS = {
+  no_evidence_reasons: "no evidence-backed reasons yet",
+  no_phone: "no phone number",
+  phone_status_below_likely: "phone not confirmed on their own website",
+  phone_status_below_verified: "phone not verified",
+  "business_flag:shared_phone": "phone shared with another business",
+  "business_flag:phone_not_on_site": "listed phone isn't on their website",
+  "business_flag:website_mismatch": "website doesn't match the business",
+  "business_flag:no_state": "no state on record",
+  "suppressed:business_id": "suppressed (opt-out)",
+  "suppressed:phone_e164": "phone number suppressed",
+  "suppressed:email": "email suppressed",
+  "suppressed:domain": "website domain suppressed",
+  dnc_unchecked: "Do-Not-Call check not done",
+  line_type_unknown: "line type unknown (mobile vs landline)",
+  line_type_not_cleared_for_ai_voice: "line type not cleared for AI-voice calls",
+  email_not_from_own_site: "email isn't from their own site",
+};
+function blockLabel(b) {
+  if (BLOCK_LABELS[b]) return BLOCK_LABELS[b];
+  if (b.startsWith("tier_below_")) return `score below tier ${b.slice(11)}`;
+  if (b.startsWith("dead:")) return `dead lead: ${b.slice(5)}`;
+  if (b.startsWith("phone_flag:")) return `phone flagged: ${b.slice(11).replace("foreign:", "foreign number ")}`;
+  return b.replaceAll("_", " ");
+}
+
+function complianceSection(c) {
+  if (!c) return section("Export gate", el("p", { class: "muted small" }, "Not scored yet, so not exportable."));
+  const pass = c.status === "pass";
+  return section("Export gate",
+    el("div", { class: "scoreline" },
+      el("span", { class: `pill ${pass ? "pill-good" : "pill-bad"}` }, pass ? "passes: exportable" : "blocked"),
+      META.export.calling_mode === "human" ? el("span", { class: "muted small" }, "for human-dialled calls") : null),
+    c.blocks.length ? el("ul", { class: "facts" }, c.blocks.map((b) => el("li", {}, el("span", { class: "pill pill-bad" }, "block"), el("span", {}, blockLabel(b))))) : null,
+    c.warnings.length ? el("ul", { class: "facts" }, c.warnings.map((w) => el("li", {}, el("span", { class: "pill pill-warn" }, "note"), el("span", {}, blockLabel(w))))) : null,
+    pass ? el("div", { class: "opener" },
+      el("div", { class: "muted small" }, "Opener (built from their strongest stored reason)"),
+      c.opener ? el("q", {}, c.opener) : el("p", { class: "muted small" }, "None: no reason strong enough to open with, so the caller leads with the question instead.")) : null);
+}
+
 function renderDetail(d) {
   const b = d.business;
   $("#d-name").textContent = b.name;
@@ -373,6 +422,8 @@ function renderDetail(d) {
           el("li", {}, el("span", { class: "mono" }, `${c.points > 0 ? "+" : ""}${c.points}`), el("span", { class: "muted small" }, c.dimension), el("span", {}, c.item.replaceAll("_", " "))))),
         el("p", { class: "muted small" }, `Model ${s.model_version}. Total = 0.35 pain + 0.25 value + 0.25 reachability + 0.15 fit.`))));
   }
+
+  body.push(complianceSection(d.compliance));
 
   // Why this lead: evidence-backed reasons only (Stage 2+). Never invented.
   const why = el("div", { class: "why" }, el("h3", {}, "Why this lead"));
@@ -457,7 +508,7 @@ function renderDetail(d) {
     d.suppression.some((s) => s.match_type === "business_id")
       ? el("span", { class: "muted" }, "Already suppressed.")
       : el("button", { type: "button", class: "btn btn-danger", onclick: () => askSuppress(b) }, "Suppress (opt-out)…"),
-    el("span", { class: "muted small", title: META.export.why }, "Export opens after the compliance gate."))));
+    el("span", { class: "muted small", title: META.export.why }, "Use “Export passing leads” (top right) to download every lead in the current list that passes the gate."))));
 
   $("#d-body").replaceChildren(...body);
 }
@@ -566,6 +617,38 @@ async function doSuppress(e) {
   }
 }
 
+// ---------------------------------------------------------------- export
+
+async function doExport() {
+  const btn = $("#export-btn");
+  btn.disabled = true;
+  btn.textContent = "Exporting…";
+  try {
+    const res = await fetch(`/api/export?${filterParams()}`, {
+      method: "POST", credentials: "same-origin",
+      headers: { "Content-Type": "application/json" }, body: "{}",
+    });
+    if (!res.ok) throw new Error(`${res.status}`);
+    const passed = Number(res.headers.get("X-Export-Passed") || 0);
+    const blocked = Number(res.headers.get("X-Export-Blocked") || 0);
+    const blob = await res.blob();
+    const name = (res.headers.get("Content-Disposition") || "").match(/filename="([^"]+)"/)?.[1] || "leads.csv";
+    if (passed) {
+      const a = el("a", { href: URL.createObjectURL(blob), download: name });
+      document.body.append(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
+    }
+    $("#export-note").textContent = `${fmt.format(passed)} exported, ${fmt.format(blocked)} blocked by the gate` +
+      (passed >= META.export.max_rows ? ` (capped at ${fmt.format(META.export.max_rows)}; narrow the filters)` : "");
+    $("#export-note").hidden = false;
+  } catch (err) {
+    showError(err);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Export passing leads";
+  }
+}
+
 // ------------------------------------------------------------------ init
 
 async function init() {
@@ -577,7 +660,9 @@ async function init() {
     return;
   }
   $("#meta-line").textContent = `${fmt.format(META.total)} businesses · Overture ${META.release ?? "—"} · config ${META.config_hash}`;
-  $("#export-pill").title = META.export.why;
+  const ex = $("#export-btn");
+  ex.title = META.export.why;
+  ex.addEventListener("click", doExport);
   $("#sort").replaceChildren(...META.sorts.map((s) => el("option", { value: s.key }, s.label)));
 
   state = readUrl();

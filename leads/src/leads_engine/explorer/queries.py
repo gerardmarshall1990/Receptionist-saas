@@ -105,6 +105,7 @@ class Filters:
     signals: tuple[str, ...] = ()
     callable_now: bool = False
     include_suppressed: bool = False
+    compliance: str | None = None  # 'pass' | 'blocked' (latest stored gate result)
     # Filled by the API, not by users:
     callable_pairs: tuple[tuple[str, str], ...] = ()  # (category, tz) inside a call window now
     suppressed: Suppressed = Suppressed()
@@ -163,6 +164,8 @@ def build_where(f: Filters, cfg: AppConfig) -> Where:
             w.add(f"{col} = %s", values[0])
         elif values:
             w.add(f"{col} = any(%s)", list(values))
+    if f.compliance in ("pass", "blocked"):
+        w.add("b.compliance_status = %s", f.compliance)
     if f.q and f.q.strip():
         w.add("b.search_text like %s", f"%{_like_escape(f.q.strip().lower())}%")
     for val, present in (
@@ -228,7 +231,7 @@ def decode_cursor(cursor: str, sort: Sort) -> list[Any]:
 LIST_COLUMNS = (
     "b.id, b.name, b.category, b.subcategory, b.city, b.state, b.tz, b.phone, b.phone_status,"
     " b.website, b.domain, b.email_status, b.location_count, b.flags, b.score, b.tier,"
-    " b.source_confidence"
+    " b.source_confidence, b.compliance_status"
 )
 
 

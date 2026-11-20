@@ -1,0 +1,40 @@
+# Stage 5 compliance gate (spec section 7). An ENGINEERING gate, not legal advice:
+# counsel must review before calling at scale. Bump `version` on any change.
+version: 1
+
+# Who places the calls. "human": a person dials (pilot). "ai_voice": an AI/artificial
+# voice dials; then only line types in `ai_voice_line_types` may pass (FCC 2024: AI
+# voices are "artificial voice" under the TCPA; mobiles need prior express consent).
+calling_mode: human
+
+export:
+  min_tier: B                 # A and B only
+  min_reasons: 1              # evidence-backed "why this lead" rows (weight > 0)
+  max_reasons: 3              # spec: 2-3 reasons, most predictive first
+  ui_max_rows: 5000           # explorer download cap per export
+  allowed_sources: [overture]
+  allowed_licenses: [CDLA-Permissive-2.0, Apache-2.0, ODbL-1.0]
+  # Phone flags from normalization; any "foreign:XX" flag also blocks.
+  blocked_phone_flags: [invalid, unparseable, toll_free, premium_rate, shared_cost, suspicious]
+  # Business flags that make the listed contact unsafe to use.
+  blocked_business_flags: [shared_phone, website_mismatch, phone_not_on_site, no_state]
+
+countries:
+  US:
+    enabled: true
+    min_phone_status: likely  # likely = listed by the source AND on their own site
+    # National/state DNC scrub needs an FTC SAN account (org registration). Calls to
+    # business lines are generally outside DNC rules; sole traders may not be.
+    # true -> every record is blocked until a DNC check exists.
+    require_dnc_check: false
+    ai_voice_line_types: [landline]
+  CA: {enabled: false, min_phone_status: verified, require_dnc_check: true, ai_voice_line_types: []}
+  AU: {enabled: false, min_phone_status: verified, require_dnc_check: true, ai_voice_line_types: []}
+  GB: {enabled: false, min_phone_status: verified, require_dnc_check: true, ai_voice_line_types: []}
+
+needs_counsel:
+  - "US: is calling a 'likely' business number (line type unknown) by a human rep acceptable without a DNC scrub?"
+  - "US: state mini-TCPA laws (FL, OK, MD, WA...) on business calls, call times, Sundays/holidays."
+  - "US: AI-voice outbound requires prior express consent for mobiles; we cannot tell mobile from landline yet."
+  - "CA/AU/GB: CASL/DNCL, Do Not Call Register, PECR/TPS/CTPS before enabling those countries."
+  - "Storing derived signals from Google reviews (currently not stored or used)."

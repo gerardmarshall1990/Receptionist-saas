@@ -27,7 +27,9 @@ function check(cond, msg) {
   await page.locator("#f-category label", { hasText: "Dental practices" }).locator("input").check();
   await page.waitForFunction(() => document.querySelector("#count").textContent.includes("5 leads"));
   check(page.url().includes("category=dental"), "filter is in the URL");
-  check(await page.isVisible("#g-subcategory"), "subcategory filter appears for chosen category");
+  // Subcategories render from the facets request, which can land after the count: wait for it.
+  const subsShown = await page.waitForSelector("#g-subcategory:not([hidden])", { timeout: 5000 }).then(() => true, () => false);
+  check(subsShown, "subcategory filter appears for chosen category");
 
   await page.locator("#f-flags .chip", { hasText: "Multiple locations" }).click();
   await page.waitForFunction(() => document.querySelector("#count").textContent.includes("3 leads"));

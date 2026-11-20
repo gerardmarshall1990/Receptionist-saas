@@ -160,7 +160,7 @@ opener_templates:
     template: "Your site asks callers to leave a message, and most drivers with a breakdown call the next shop."
   - id: hard_to_reach_reviews
     requires_signal: review_hard_to_reach
-    template: "A few reviews for {name} mention not getting through on the phone, and we answer every call so your techs don't have to."
+    template: "A review for {name} mentions not getting through on the phone, and we answer every call so your techs don't have to."
 
 open_questions:
   - "Value weight 0.55 is the lowest; does the $389 price clear the bar for small general-repair shops?"

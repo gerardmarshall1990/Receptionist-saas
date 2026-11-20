@@ -433,3 +433,48 @@ def test_voicemail_left_by_the_business_is_not_caller_voicemail() -> None:
         "Left an after hours voicemail when the AC quit in the evening and they called back fast."
     )
     assert extract(_p(caller), BIZ, CFG).signals["leave_message_text"].value
+
+
+# v7: emails glued to neighbouring text (found in the Stage 5 export hand check).
+@pytest.mark.parametrize(
+    ("html", "expected"),
+    [
+        # Adjacent block elements: the page text must keep them apart.
+        ("<div>(704) 664-2498</div><div>ThompsonPlumbing@Windstream.net</div>",
+         {"thompsonplumbing@windstream.net"}),
+        ("<p>IL 60007</p><span>Email</span><span>info@oralsurgeryil.com</span><p>Office</p>",
+         {"info@oralsurgeryil.com"}),
+        # Glued inside one text node: dropped, never repaired.
+        ("<p>Call 776-5691jason@briwv.comwv today</p>", set()),
+        ("<p>info@cougarmechanical.comoffice</p>", set()),
+        ("<p>Write to 60007emailinfo@x-dental.com</p>", set()),
+        # Ordinary text emails still work, including ones that start with digits.
+        ("<p>Email: 247plumbing@gmail.com, or office@joesplumbing.com.</p>",
+         {"247plumbing@gmail.com", "office@joesplumbing.com"}),
+        # mailto links are trusted as written.
+        ('<a href="mailto:Front.Desk@SmileCo.com">write</a>', {"front.desk@smileco.com"}),
+    ],
+)  # fmt: skip
+def test_site_emails_are_whole_tokens(html: str, expected: set[str]) -> None:
+    pages = [
+        parse(f"<html><title>t</title><body>{html}</body></html>", "https://joesplumbing.com/")
+    ]
+    assert set(dict(extract(pages, PLUMBER, CFG).emails)) == expected
+
+
+def test_page_text_keeps_element_boundaries_but_not_inside_words() -> None:
+    p = parse(
+        "<html><body><div>Mon-Fri</div><div>8-5</div><p>Emer<b>gency</b> service</p></body></html>",
+        "https://x.com/",
+    )
+    assert "Mon-Fri 8-5" in p.text
+    assert "Emergency service" in p.text
+
+
+def test_page_text_survives_control_characters_and_skips_comments() -> None:
+    p = parse(
+        "<html><body><p>Call\x0bus</p><!-- hidden note --><div>today</div></body></html>",
+        "https://x.com/",
+    )
+    assert "hidden note" not in p.text
+    assert p.text.endswith("today")

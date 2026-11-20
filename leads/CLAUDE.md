@@ -22,10 +22,10 @@ Read first: `docs/MASTER-SPEC.md` (the spec), `docs/ICP.md` (who we target), `do
 One stage at a time (spec §9): explore -> plan -> **wait for approval** -> implement with tests -> verify -> report
 (done / tested / untested / gaps / open questions) -> **wait for "verified"**. Commit after each green stage. Ask before adding scope.
 
-Current status: **Stage 4 (rule-based scoring) in review**. Stages 0, 1, 1b, 2 verified; Stage 3 redirected
-(no paid phone lookups; live Google reviews panel in the explorer).
+Current status: **Stage 5 (compliance gate + export) in review**. Stages 0, 1, 1b, 2, 4 verified; Stage 3
+redirected (no paid phone lookups; live Google reviews panel in the explorer).
 Reports: `docs/reports/stage1-pilot-*.md`, `explorer-benchmark.md`, `stage2-crawl-pilot.md`, `stage2-precision.md`,
-`stage4-scoring-pilot.md`. Next: Stage 5 (compliance gate + export) plan.
+`stage4-scoring-pilot.md`, `stage5-export.md`. Next: Stage 6 (pilot readout) plan.
 
 ## Commands
 
@@ -78,6 +78,15 @@ uv run leads crawl report        # docs/reports/stage2-crawl-pilot.md (incl. 100
 # Stage 4: rule-based score (Pain x Value x Reachability x Fit) from stored signals ($0, idempotent)
 uv run leads score run           # writes scores (+ itemised components) and businesses.score/tier
 
+# Stage 5: compliance gate + export ($0). Rules: config/compliance.yaml (versioned; counsel reviews)
+uv run leads compliance check    # gate every scored lead; stores pass/blocked + reasons for the explorer
+uv run leads export run --dry-run   # counts only
+uv run leads export run [--categories plumbing] [--states TX,FL] [--limit 500]
+                                 # -> data/exports/<stamp>-<id>/{leads.parquet,leads.csv,manifest.json}
+uv run leads export list
+uv run leads suppress add --type phone_e164 --value "(512) 555-0100" --reason "asked not to be called"
+uv run leads suppress import optouts.csv --source "crm"   # columns: match_type,match_value[,reason]
+
 # browser test (needs node + playwright; runs inside pytest when TEST_DATABASE_URL is set)
 LEADS_E2E_SCREENSHOTS=/some/dir uv run pytest tests/test_explorer_e2e.py -s
 ```
@@ -97,6 +106,7 @@ One-liner before every commit:
 config/global.yaml            release pin, calling-hours guard rail, exclusions, vendor names, chain/dedupe
                               thresholds, directory/platform domains, pilot sample sizes, watch list
 config/scoring.yaml           dimension weights, tiers, funnel fractions, signal weights, prescore points
+config/compliance.yaml        export gate: per-country rules, calling mode, DNC switch, needs_counsel list
 config/models.yaml            LLM model names, effort, prices, token estimates (cost projection)
 config/categories/*.yaml      one file per category (file name == slug)
 src/leads_engine/settings.py  env-based runtime settings (LEADS_* vars, .env)
@@ -110,6 +120,7 @@ src/leads_engine/crawl/       fetcher.py (one site, politeness), runner.py (queu
                               html.py (parse), extract.py (signal rules), store.py (DB writes), report.py
 src/leads_engine/explorer/    app.py (FastAPI API + auth/CSP), queries.py (whitelisted SQL, keyset paging),
                               facts.py (Stage 1 facts, call windows), bench.py, static/ (no-build UI)
+src/leads_engine/compliance/  gate.py (pure gate), openers.py ($0 openers), export.py (contract, files, audit)
 src/leads_engine/scoring/     prescore.py (pure score + components), run.py (stream, COPY, MERGE)
 src/leads_engine/universe/    overture.py (remote read), normalize.py (pure), build.py (exclude/chain/dedupe/
                               sample), load.py (Postgres upsert), report.py, pipeline.py (paths + steps)
@@ -132,7 +143,8 @@ data/                         raw/derived bulk files (Parquet). Gitignored. Neve
   name would also hit independents. Review the chain table in the Stage 1 report after any change.
 - **Explorer rules:** every filter/sort is whitelisted server-side and values are bound parameters; the UI inserts
   data only as text. "Why this lead" shows ONLY rows from the `reasons` table (evidence + source URL); Stage 1
-  facts are shown separately and restate stored fields. No export until the Stage 5 compliance gate.
+  facts are shown separately and restate stored fields. Export ONLY through `compliance/export.py`
+  (gate re-run + suppression re-read at write time, every export audited in `exports`/`export_items`).
   Re-run `leads ui bench` after changing queries or indexes; target p95 < 300 ms at 3M rows.
 - **Crawler rules (spec section 7):** robots.txt first (401/403 = disallow all, 5xx = retry later), Crawl-delay
   honored, one request at a time per site and >= per_site_delay_s apart, <= max_pages_per_site, same site only.

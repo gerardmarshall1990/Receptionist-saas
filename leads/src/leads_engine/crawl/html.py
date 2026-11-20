@@ -13,6 +13,10 @@ _SKIP_EXT = re.compile(
     r"\.(pdf|jpe?g|png|gif|webp|svg|zip|docx?|xlsx?|mp4|mp3|ico|css|js)(\?|$)", re.I
 )
 _WS = re.compile(r"\s+")
+# Text-formatting tags that sit inside a word or phrase. Every other element is a
+# boundary: without a space, "<div>664-2498</div><div>info@x.com</div>" reads as
+# "664-2498info@x.com" (v7 email fix).
+_INLINE = frozenset({"b", "strong", "i", "em", "u", "small", "sup", "sub", "mark", "abbr", "font"})
 
 
 @dataclass(frozen=True)
@@ -38,6 +42,28 @@ def _host(url: str) -> str:
     except ValueError:
         return ""
     return h[4:] if h.startswith("www.") else h
+
+
+def _visible_text(doc: lxml.html.HtmlElement) -> str:
+    """Like text_content(), but with a space at every non-inline element boundary.
+
+    Walks the tree instead of editing it: lxml refuses to re-assign text that holds
+    control characters, which real pages contain.
+    """
+    out: list[str] = []
+    for event, el in etree.iterwalk(doc, events=("start", "end")):
+        boundary = isinstance(el.tag, str) and el.tag not in _INLINE
+        if event == "start":
+            if boundary:
+                out.append(" ")
+            if isinstance(el.tag, str) and el.text:  # comments/PIs: skip their content
+                out.append(el.text)
+        else:
+            if boundary:
+                out.append(" ")
+            if el.tail and el is not doc:
+                out.append(el.tail)
+    return "".join(out)
 
 
 def parse(html: str, url: str) -> Page:
@@ -68,7 +94,7 @@ def parse(html: str, url: str) -> Page:
                 page.links.append(Link(absolute, label))
     for bad in doc.xpath("//script|//style|//noscript|//template|//svg"):
         bad.drop_tree()
-    page.text = _WS.sub(" ", doc.text_content()).strip()
+    page.text = _WS.sub(" ", _visible_text(doc)).strip()
     return page
 
 

@@ -120,13 +120,14 @@ best_call_windows:
 opener_templates:
   - id: after_hours
     requires_signal: emergency_247_claim
-    template: "I saw {name} says you're available 24/7, so when someone calls from a police station at midnight, who answers?"
+    # The signal fires on emergency/urgent wording with or without 24/7: claim only urgent help.
+    template: "I saw {name} offers urgent help, so when someone calls from a police station at midnight, who answers?"
   - id: leave_a_message
     requires_signal: leave_message_text
     template: "Your site asks callers to leave a message, and someone who was just in an accident usually calls the next firm instead."
   - id: hard_to_reach_reviews
     requires_signal: review_hard_to_reach
-    template: "A couple of reviews for {name} mention calls not being returned, and we make sure every caller gets a live answer."
+    template: "A review for {name} mentions calls not being returned, and we make sure every caller gets a live answer."
 
 open_questions:
   - "Include immigration and estate planning? Currently excluded per spec."

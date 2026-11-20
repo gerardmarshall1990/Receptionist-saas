@@ -16,7 +16,8 @@
     </div>
     <div class="topbar-meta" id="meta-line">Loading…</div>
     <div class="topbar-right">
-      <span class="pill pill-muted" id="export-pill" title="">Export locked</span>
+      <span class="muted small" id="export-note" aria-live="polite" hidden></span>
+      <button type="button" class="btn btn-primary" id="export-btn">Export passing leads</button>
     </div>
   </header>
 
@@ -51,6 +52,10 @@
         <h3>Signals &amp; cautions</h3>
         <p class="hint">Click to require, again to exclude.</p>
         <div id="f-flags" class="chips"></div>
+      </section>
+      <section class="fgroup">
+        <h3>Compliance</h3>
+        <div id="f-compliance" class="tri-list"></div>
       </section>
       <section class="fgroup">
         <h3>Tier</h3>

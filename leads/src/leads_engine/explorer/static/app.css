@@ -61,7 +61,7 @@ small, .small { font-size: 12px; }
 .brand { display: flex; align-items: center; gap: 8px; font-weight: 650; font-size: 15px; white-space: nowrap; }
 .brand-mark { color: var(--accent); }
 .topbar-meta { color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.topbar-right { margin-left: auto; }
+.topbar-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
 
 /* layout */
 .layout { display: grid; grid-template-columns: 270px minmax(0, 1fr); height: calc(100% - 53px); }
@@ -79,6 +79,11 @@ small, .small { font-size: 12px; }
 .btn { font: inherit; cursor: pointer; border: 1px solid var(--border); background: var(--panel); color: var(--text);
   border-radius: 8px; padding: 7px 14px; }
 .btn:hover { background: var(--panel-2); }
+.btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn-primary:hover { filter: brightness(1.08); background: var(--accent); }
+.btn:disabled { opacity: .6; cursor: progress; }
+.opener { margin-top: 10px; padding: 10px 12px; border-left: 3px solid var(--accent); background: var(--accent-soft); border-radius: 6px; }
+.opener q { display: block; margin-top: 4px; font-style: italic; }
 .btn-danger { background: var(--bad); color: #fff; border-color: var(--bad); }
 .btn-danger:hover { filter: brightness(1.05); background: var(--bad); }
 .link-btn { background: none; border: 0; color: var(--accent); cursor: pointer; font: inherit; padding: 0; }
@@ -185,6 +190,7 @@ table.leads { width: 100%; border-collapse: collapse; }
 
 /* narrow screens: filters become a drawer, table becomes cards */
 @media (max-width: 900px) {
+  #export-note { display: none; }
   .only-narrow { display: inline-block; }
   .layout { grid-template-columns: 1fr; }
   .filters { position: fixed; top: 53px; left: 0; bottom: 0; width: min(320px, 88%); z-index: 25;

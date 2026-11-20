@@ -111,7 +111,7 @@ opener_templates:
     template: "Your site asks callers to leave a message, and someone with water coming through the ceiling usually calls the next company."
   - id: hard_to_reach_reviews
     requires_signal: review_hard_to_reach
-    template: "A couple of reviews for {name} mention trouble reaching you by phone, which is exactly the problem we fix."
+    template: "A review for {name} mentions trouble reaching you by phone, which is exactly the problem we fix."
 
 open_questions:
   - "One config or split roofing vs. restoration? Roofers are storm/seasonal; restoration is 24/7 and insurance-driven."

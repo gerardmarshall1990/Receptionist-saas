@@ -97,6 +97,11 @@ class Website:
     host: str | None = None
 
 
+def has_public_suffix(domain: str) -> bool:
+    """True if the domain ends in a real public suffix (com, co.uk, ...)."""
+    return bool(_EXTRACT(domain).suffix)
+
+
 def _registrable(host: str) -> str:
     ext = _EXTRACT(host)
     return f"{ext.domain}.{ext.suffix}" if ext.suffix else ext.domain

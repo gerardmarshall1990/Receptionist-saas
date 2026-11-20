@@ -139,7 +139,7 @@ opener_templates:
     template: "It looks like new patients can only book {name} by phone, so every call during a busy check-in is at risk."
   - id: hold_reviews
     requires_signal: review_hard_to_reach
-    template: "A few reviews for {name} mention long holds or not getting through, and we make sure every call gets answered."
+    template: "A review for {name} mentions long holds or not getting through, and we make sure every call gets answered."
 
 open_questions:
   - "Decision-maker is often the office manager, not the dentist: is that who we target?"
