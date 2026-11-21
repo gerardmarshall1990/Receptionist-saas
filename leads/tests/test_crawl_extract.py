@@ -502,3 +502,34 @@ def test_v8_new_category_false_positives(text: str, signal: str, expected: bool)
     assert (
         signal in extract(_p(text), {"name_key": "x", "category": "law_small"}, CFG).signals
     ) is expected
+
+
+# v9: second law sample (v8), every false positive plus true positives that must survive.
+@pytest.mark.parametrize(
+    ("text", "signal", "expected"),
+    [
+        ("Weekends: By Appointment. Call Answering Available 24/7 & All Calls Are Returned Same Business Day!",
+         "emergency_247_claim", False),
+        ("Reports may be made by phone. An on-call caseworker is available 24 hours a day.", "emergency_247_claim", False),
+        ("If you're reporting an emergency, call 911 to be connected to the emergency services you require.",
+         "emergency_247_claim", False),
+        ("Check for injuries. Call emergency services and the police.", "emergency_247_claim", False),
+        ("Personal Injury Lawyers. 20+ Years of Experience. Available 24/7. No Fees Unless We Win.", "emergency_247_claim", True),
+        ("Free Consultation | Call 24/7: (619) 691-8942", "emergency_247_claim", True),
+        ("Phone number. Is it ok for an attorney to leave a voicemail message? * Yes No", "leave_message_text", False),
+        ("Preferred contact method: Phone Email. May we leave a voicemail? Choose an option Yes No", "leave_message_text", False),
+        ("Monday - Friday 8:00 AM - 5:00 PM. After-hours voicemail available.", "leave_message_text", True),
+        ("To schedule an appointment, call us at any of the numbers below. You can also fill out our contact form.",
+         "phone_only_booking", False),
+        ("Free Consultations for Personal Injury Cases. Call to Schedule an Appointment.", "phone_only_booking", True),
+        ("Practice areas: Breach of Contract, Business Owner and Operator disputes, Class Action.", "owner_operated", False),
+        ("We handle complicated divorces, like high net worth divorces and those involving family owned businesses.",
+         "owner_operated", False),
+        ("We're a family-owned law firm with over 80 years' experience.", "owner_operated", True),
+        ("Get legal advice from locally owned Blake Law Group, LLC.", "owner_operated", True),
+    ],
+)  # fmt: skip
+def test_v9_law_sample_false_positives(text: str, signal: str, expected: bool) -> None:
+    assert (
+        signal in extract(_p(text), {"name_key": "x", "category": "law_small"}, CFG).signals
+    ) is expected

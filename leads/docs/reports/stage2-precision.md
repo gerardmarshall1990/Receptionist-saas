@@ -55,3 +55,21 @@ are regression tests:
 element boundaries; text emails must be whole tokens on a real TLD; bad matches are dropped, never repaired.
 Signal counts barely moved (e.g. leave_message_text 45, hiring_receptionist 147, phone_only_booking 286).
 
+
+## New categories (Stage 7): law first
+
+The crawl goes best-first, so law firms (value weight 0.95) arrive first; roofing, electrical and auto follow.
+
+**v7 sample (6 hits per signal, mostly law):** answering service 6/6, hiring 6/6, emergency 5/6, multiple
+locations 5/6, owner-operated 5/6, voicemail 4/6, phone-only 4/6, pricing 4/6 (both misses were the wrong website).
+**v8 fixes:** "line is answered 24 hours" is live-answer coverage; reviews about *other / many attorneys* and
+"in a world of ... voicemail" praise are excluded; "email or call" and "submit your inquiry" are other channels;
+"our clients range from family-owned businesses" is about clients.
+
+**v8 sample (10 per signal, law only):** limited hours 10/10, phone-only 9/10, emergency 7/10, voicemail 7/10,
+owner-operated 7/10. **v9 fixes:** "call answering 24/7" is coverage; 911, public "emergency services" and
+government hotlines are not a claim; intake-form questions ("May we leave a voicemail? Yes/No") are not voicemail;
+"you can also fill out" is another channel; owner wording about other businesses or a practice-area list is
+excluded; "Call 24/7" now counts like "Call us 24/7". Every miss is a regression test.
+
+Open: roofing, electrical and auto need their own sample once the crawl reaches them (fewer than 100 sites so far).

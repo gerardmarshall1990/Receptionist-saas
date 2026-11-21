@@ -25,7 +25,9 @@ from leads_engine.universe import normalize as nz
 #     start with glued phone/ZIP digits (dropped, never repaired).
 # v8: law/roofing/electrical/auto sample: "line answered 24 hours" = live answer; reviews about other
 #     attorneys/firms; "email or call" and "submit your inquiry" are other channels; clients' "family-owned".
-EXTRACTOR_VERSION = "stage2-v8"
+# v9: second law sample: "call answering 24/7" = coverage; 911 / public emergency services / hotlines;
+#     intake-form voicemail questions; "you can also fill out"; owner wording about clients or practice areas.
+EXTRACTOR_VERSION = "stage2-v9"
 SNIPPET = 300
 
 
@@ -74,6 +76,7 @@ COMPETITOR = _rx(
 # Another online channel next to the "call us" line: not phone-only.
 ONLINE_FORM = _rx(
     r"fill out (?:the|our|a|this) (?:contact |online |appointment |request )?form",
+    r"(?:can|may) also fill out",
     r"form below",
     r"request (?:it )?online",
     r"book online",
@@ -95,25 +98,32 @@ LEAVE_MESSAGE_NOT = _rx(
     r"reminders?",
     r"many practices",
     r"your regular dentist",
+    # Intake-form questions: "May we leave a voicemail? Yes / No".
+    r"may we leave",
+    r"\bok(?:ay)?\b[^.?]{0,40}\bto leave",
+    r"choose an option",
+    r"\byes\W+no\b",
 )
 LEAVE_MESSAGE_GUARD = _rx(LEAVE_MESSAGE_NOT.pattern, COMPETITOR.pattern)
 
 # Must read as a claim about their service, not "your AC runs 24/7" or "avoid emergency repairs".
 EMERGENCY = _rx(
-    r"(?:available|open|on call|service|services|emergenc\w+|answer\w*|respon\w+|here for you|call us)\W{0,25}24 ?[/-] ?7",
+    r"(?:available|open|on call|service|services|emergenc\w+|answer\w*|respon\w+|here for you|call(?: us)?)\W{0,25}24 ?[/-] ?7",
     r"24 ?[/-] ?7\W{0,25}(?:emergenc\w+|service|availab\w+|support|response|repairs?|plumb\w*|hvac|ac\b|dentist\w*)",
     r"24 hours? a day", r"24[- ]hours? (?:emergency|service|response)",
-    r"emergency (?:service|services|repairs?|calls?|appointments?|plumb\w*|dentist\w*|dental care|response)",
+    # Not public services: "call emergency services", "connected to the emergency services".
+    r"(?<!call )(?<!dial )(?<!the )emergency (?:service|services|repairs?|calls?|appointments?|plumb\w*|dentist\w*|dental care|response)",
     r"same[- ]day emergenc\w+", r"around the clock", r"round[- ]the[- ]clock", r"day or night",
 )  # fmt: skip
 EMERGENCY_NOT = _rx(
     r"(?:avoid|prevent|reduce|reducing|costly|expensive|minimi[sz]e)\W+(?:\w+\W+){0,3}$",
     r"(?:running|working|runs|works)\W+$",
     r"(?:fire|police|medical|county|city)\W+(?:and|&)?\W*$",  # "Fire and Emergency Services"
+    r"\b(?:911|caseworkers?|hotlines?|crisis line)\b\W+(?:\w+\W+){0,12}$",
 )
 # The business already has someone (or something) answering: no 24/7 pain claim then.
 COVERAGE = _rx(
-    r"live answer\w*", r"answered 24 ?/ ?7", r"answered 24 hours", r"(?:line|lines|phones?) (?:is|are) answered", r"(?:a )?real (?:person|human|plumber|technician|tech) (?:always )?answers",
+    r"live answer\w*", r"call answering", r"answered 24 ?/ ?7", r"answered 24 hours", r"(?:line|lines|phones?) (?:is|are) answered", r"(?:a )?real (?:person|human|plumber|technician|tech) (?:always )?answers",
     r"live person answers", r"we always answer", r"live operators?", r"live dispatch\w*",
     r"dispatchers? (?:are )?available 24", r"answers? (?:all|every|our) (?:phone )?calls", r"person to person",
     r"someone (?:from our team )?(?:always )?answers", r"when you call(?: us)?, we answer",
@@ -155,7 +165,12 @@ OWNER_OPERATED = _rx(
     r"family[- ]owned", r"locally[- ]owned", r"owner[- ]operated", r"family[- ]operated", r"owner and operator",
 )  # fmt: skip
 # About their clients, not them: "our clients range from family-owned businesses to ...".
-OWNER_NOT = _rx(r"(?:clients?|customers?|serve|serving|work with|help)\W+(?:\w+\W+){0,3}$")
+OWNER_NOT = _rx(
+    r"(?:clients?|customers?|serve|serving|work with|help)\W+(?:\w+\W+){0,3}$",
+    # Other people's businesses or a practice-area list: "involving family owned businesses", "Business Owner and Operator".
+    r"\b(?:involving|including|for|of|with|like|such as)\W+(?:\w+\W+){0,1}$",
+    r"\bbusiness\W+$",
+)
 # "Independently owned and operated" is the standard FRANCHISE disclaimer, not independence.
 FRANCHISE = _rx(
     r"(?:each|every) (?:franchise|location|office) is independently owned",
