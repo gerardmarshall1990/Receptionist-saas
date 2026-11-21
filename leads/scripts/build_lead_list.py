@@ -18,8 +18,13 @@ import pyarrow.parquet as pq
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def clean(text: str | None) -> str | None:
+    """Drop U+FFFD left by pages with broken encodings (the page publisher rejects it)."""
+    return text.replace("\ufffd", "") if text else text
+
+
 def trim(text: str | None, n: int = 240) -> str:
-    t = " ".join((text or "").split())
+    t = " ".join((clean(text) or "").split())
     return t if len(t) <= n else t[:n].rsplit(" ", 1)[0] + "…"
 
 
@@ -41,7 +46,7 @@ def main() -> None:
                 "id": r["business_id"],
                 "n": r["name"],
                 "c": r["category"],
-                "ci": r["city"],
+                "ci": clean(r["city"]),
                 "st": r["state"],
                 "tz": r["tz"],
                 "ph": r["phone_e164"],
@@ -49,7 +54,7 @@ def main() -> None:
                 "w": r["website"],
                 "s": round(r["score"], 1),
                 "t": r["tier"],
-                "o": r["opener"],
+                "o": clean(r["opener"]),
                 "win": r["best_call_window"],
                 "r": [
                     {"g": x["signal"], "e": trim(x["evidence"]), "u": x["source_url"]}
