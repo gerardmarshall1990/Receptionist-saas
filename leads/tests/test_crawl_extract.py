@@ -478,3 +478,27 @@ def test_page_text_survives_control_characters_and_skips_comments() -> None:
     )
     assert "hidden note" not in p.text
     assert p.text.endswith("today")
+
+
+# v8: false positives from the first law / roofing / electrical / auto crawl sample.
+@pytest.mark.parametrize(
+    ("text", "signal", "expected"),
+    [
+        ("Call, chat, or submit the form. Our Tampa line is answered 24 hours a day.", "emergency_247_claim", False),
+        ("GET A FREE CASE REVIEW CALL US 24/7 AT (904) 777-5646", "emergency_247_claim", True),
+        ("If you have been arrested, we are available 24 hours a day, 7 days a week.", "emergency_247_claim", True),
+        ("So nice to have someone answer the phone, especially in a world of automation, answering machines, "
+         "and voicemail.", "leave_message_text", False),
+        ("I called and left voicemails for many attorneys looking for help. Peter called back.", "leave_message_text", False),
+        ("AFTER HOURS EMERGENCY: call and leave a voicemail with your contact information.", "leave_message_text", True),
+        ("You may also email or call us to make an appointment.", "phone_only_booking", False),
+        ("Submit your legal inquiry, and we'll call you back. Call for an appointment.", "phone_only_booking", False),
+        ("Injury cases for over 30 years. Call us for an appointment.", "phone_only_booking", True),
+        ("Our clients range from family-owned businesses to multinational corporations.", "owner_operated", False),
+        ("27 Years of Combined Experience | Locally Owned | Responsive", "owner_operated", True),
+    ],
+)  # fmt: skip
+def test_v8_new_category_false_positives(text: str, signal: str, expected: bool) -> None:
+    assert (
+        signal in extract(_p(text), {"name_key": "x", "category": "law_small"}, CFG).signals
+    ) is expected

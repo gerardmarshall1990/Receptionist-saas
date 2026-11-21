@@ -23,7 +23,9 @@ from leads_engine.universe import normalize as nz
 # v6: price must follow its keyword; business-left voicemail ignored.
 # v7: page text keeps element boundaries; text emails must end on a real TLD and must not
 #     start with glued phone/ZIP digits (dropped, never repaired).
-EXTRACTOR_VERSION = "stage2-v7"
+# v8: law/roofing/electrical/auto sample: "line answered 24 hours" = live answer; reviews about other
+#     attorneys/firms; "email or call" and "submit your inquiry" are other channels; clients' "family-owned".
+EXTRACTOR_VERSION = "stage2-v8"
 SNIPPET = 300
 
 
@@ -62,9 +64,12 @@ LEAVE_MESSAGE = _rx(
 )  # fmt: skip
 # Reviews that talk about OTHER businesses ("unlike 2 other plumbers I called ...").
 COMPETITOR = _rx(
-    r"\b(?:last|other|another|previous|prior)\s+(?:company|companies|plumbers?|dentists?|contractors?|"
-    r"hvac (?:company|companies)|providers?|offices?|businesses)",
+    r"\b(?:last|other|another|previous|prior|many|several|multiple)\s+(?:company|companies|plumbers?|dentists?|"
+    r"contractors?|hvac (?:company|companies)|providers?|offices?|businesses|attorneys?|lawyers?|law firms?|"
+    r"firms?|electricians?|roofers?|roofing companies|mechanics?|shops?|garages?)",
     r"\bunlike\b",
+    # Praise for a human answering, set against voicemail in general.
+    r"world of (?:automation|answering machines|voice ?mail|robots|phone trees)",
 )
 # Another online channel next to the "call us" line: not phone-only.
 ONLINE_FORM = _rx(
@@ -73,6 +78,9 @@ ONLINE_FORM = _rx(
     r"request (?:it )?online",
     r"book online",
     r"(?:email|e-mail) us",
+    r"(?:email|e-mail) or call",
+    r"call or (?:email|e-mail)",
+    r"submit (?:your|a|an) (?:legal |case |online )?(?:inquiry|request|question|case)",
 )
 # Boilerplate that mentions voicemail without saying callers end up there.
 LEAVE_MESSAGE_NOT = _rx(
@@ -105,7 +113,7 @@ EMERGENCY_NOT = _rx(
 )
 # The business already has someone (or something) answering: no 24/7 pain claim then.
 COVERAGE = _rx(
-    r"live answer\w*", r"answered 24 ?/ ?7", r"(?:a )?real (?:person|human|plumber|technician|tech) (?:always )?answers",
+    r"live answer\w*", r"answered 24 ?/ ?7", r"answered 24 hours", r"(?:line|lines|phones?) (?:is|are) answered", r"(?:a )?real (?:person|human|plumber|technician|tech) (?:always )?answers",
     r"live person answers", r"we always answer", r"live operators?", r"live dispatch\w*",
     r"dispatchers? (?:are )?available 24", r"answers? (?:all|every|our) (?:phone )?calls", r"person to person",
     r"someone (?:from our team )?(?:always )?answers", r"when you call(?: us)?, we answer",
@@ -146,6 +154,8 @@ NEGATION = re.compile(
 OWNER_OPERATED = _rx(
     r"family[- ]owned", r"locally[- ]owned", r"owner[- ]operated", r"family[- ]operated", r"owner and operator",
 )  # fmt: skip
+# About their clients, not them: "our clients range from family-owned businesses to ...".
+OWNER_NOT = _rx(r"(?:clients?|customers?|serve|serving|work with|help)\W+(?:\w+\W+){0,3}$")
 # "Independently owned and operated" is the standard FRANCHISE disclaimer, not independence.
 FRANCHISE = _rx(
     r"(?:each|every) (?:franchise|location|office) is independently owned",
@@ -351,7 +361,7 @@ def extract(pages: list[Page], business: dict[str, Any], cfg: AppConfig) -> Extr
         sig["pricing_hints"] = h
     if h := _first(MULTI_LOCATION, pages):
         sig["multiple_locations"] = h
-    if "is_chain" not in sig and (h := _first(OWNER_OPERATED, pages)):
+    if "is_chain" not in sig and (h := _first(OWNER_OPERATED, pages, not_before=OWNER_NOT)):
         sig["owner_operated"] = h
 
     # --- contacts ----------------------------------------------------------
