@@ -10,3 +10,4 @@ data/
 *.parquet
 *.duckdb
 *.duckdb.wal
+deploy/.env

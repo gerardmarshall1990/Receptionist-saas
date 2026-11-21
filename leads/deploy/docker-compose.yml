@@ -1,0 +1,62 @@
+# Lasting host for the leads engine: Postgres + explorer + crawl loop.
+#   cp deploy/.env.example deploy/.env   (set LEADS_UI_TOKEN and POSTGRES_PASSWORD)
+#   docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d
+# See docs/DEPLOY.md.
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: leads
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env}
+      POSTGRES_DB: frontdesk_leads
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U leads -d frontdesk_leads"]
+      interval: 10s
+      retries: 10
+
+  migrate:
+    build: ..
+    command: ["db", "migrate"]
+    environment: &env
+      LEADS_DATABASE_URL: postgresql://leads:${POSTGRES_PASSWORD}@db:5432/frontdesk_leads
+      LEADS_DRY_RUN: "true"
+      LEADS_RUN_BUDGET_USD: "0"
+    depends_on:
+      db: {condition: service_healthy}
+
+  explorer:
+    build: ..
+    restart: unless-stopped
+    command: ["ui", "serve", "--host", "0.0.0.0", "--port", "8765"]
+    environment:
+      <<: *env
+      LEADS_UI_TOKEN: ${LEADS_UI_TOKEN:?set LEADS_UI_TOKEN in deploy/.env}
+    volumes:
+      - lead-data:/app/data
+    ports:
+      - "127.0.0.1:8765:8765"   # put a TLS reverse proxy in front; never expose plain HTTP
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+
+  crawler:
+    build: ..
+    restart: unless-stopped
+    entrypoint: ["bash", "scripts/scale_loop.sh"]
+    command: ["100000", "20", "20"]   # rounds, minutes per round, stop below 20 GB free
+    environment:
+      <<: *env
+      PGHOST: db
+      PGUSER: leads
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: frontdesk_leads
+    volumes:
+      - lead-data:/app/data
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+
+volumes:
+  db-data:
+  lead-data:
