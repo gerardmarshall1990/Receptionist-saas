@@ -22,11 +22,13 @@ Read first: `docs/MASTER-SPEC.md` (the spec), `docs/ICP.md` (who we target), `do
 One stage at a time (spec §9): explore -> plan -> **wait for approval** -> implement with tests -> verify -> report
 (done / tested / untested / gaps / open questions) -> **wait for "verified"**. Commit after each green stage. Ask before adding scope.
 
-Current status: **Stage 7 database build running** (user: "keep going until done"): all 7 US categories loaded
-(726k), continuous best-first crawl via `scripts/pipeline.sh`. Calling at scale still waits for the pilot1 readout.
-Stages 0-6 verified (Stage 3 redirected: no paid phone lookups).
+Current status: **Stage 7 in review**. The database build in this container stopped at the disk floor with
+49,514 gated leads (`docs/reports/stage7-scale-out.md`). The rest of the crawl (~240k sites) needs the lasting host
+in `docs/DEPLOY.md`. Calling at scale still waits for the pilot1 readout. Stages 0-6 verified (Stage 3
+redirected: no paid phone lookups).
 Reports: `docs/reports/stage1-pilot-*.md`, `explorer-benchmark.md`, `stage2-crawl-pilot.md`, `stage2-precision.md`,
-`stage4-scoring-pilot.md`, `stage5-export.md`, `stage6-pilot-setup.md`, `stage6-readout-pilot1.md`.
+`stage4-scoring-pilot.md`, `stage5-export.md`, `stage6-pilot-setup.md`, `stage6-readout-pilot1.md`,
+`stage7-scale-out.md`.
 
 ## Commands
 

@@ -1,4 +1,4 @@
-# Stage 7 — scale-out (in progress)
+# Stage 7 — scale-out (this container: done at the disk floor)
 
 User, 2026-11-21: "keep going until done as per my specs." The database build goes ahead on open data at $0;
 calling at scale still waits for the pilot1 readout.
@@ -63,6 +63,7 @@ https://claude.ai/artifact/JvbTF3fXVsjukmnZmMDYZG
 | 20:01 UTC (dental 5,396, HVAC 3,540) | 40,217 | 6,194 | 3,850 |
 | 20:29 UTC (dental 7,979, HVAC 4,083) | 43,384 | 6,763 | 4,204 |
 | 20:55 UTC (dental 10,082, HVAC 4,698) | 46,172 | 7,279 | 4,505 |
+| **21:23 UTC, final in this container** | **49,514** | **7,869** | **4,833** |
 
 ## Why the crawl keeps pausing here
 
@@ -70,6 +71,36 @@ This cloud container is reclaimed a few minutes after the session goes idle; Pos
 with it. For example, after the 13:50 check-in the last crawl update was 13:54 and the container came back at 15:06.
 Nothing is lost (pages, queue and database survive; interrupted sites go back to `pending`), but the crawl only
 advances while the session is active. That is the strongest reason for the lasting host in `docs/DEPLOY.md`.
+
+## Result in this container
+
+The crawl stopped at the disk floor (6 GB free; saved pages 16 GB) after a final refresh.
+
+**Final list: 49,514 leads pass the compliance gate.** 7,869 are tier A and 4,833 have strong evidence
+(voicemail on their own site, hiring for the phones, or phone-only booking). 32,942 have an email from
+their own site and 15,545 have an opener. The list is published at
+https://claude.ai/artifact/JvbTF3fXVsjukmnZmMDYZG.
+
+| Category | Leads passing | Sites crawled | Sites still queued |
+|---|---:|---:|---:|
+| Law firms | 19,853 | 102,829 | 4,484 |
+| Dental | 12,288 | 50,489 | 51,309 |
+| Roofing / restoration | 10,269 | 38,781 | 2,500 |
+| HVAC | 5,744 | 23,869 | 15,846 |
+| Plumbing | 1,351 | 6,001 | 20,986 |
+| Electrical | 6 | 128 | 25,653 |
+| Auto repair | 3 | 225 | 120,655 |
+
+- **Crawled:** 221,548 sites (140,740 done, plus errors, blocks, robots refusals and offsite).
+- **Still queued:** 240,795, mostly auto repair (lowest value weight, so last).
+- **Rules:** extractor v12, after six rounds of hand grading on law, roofing and HVAC/dental.
+
+## To finish on a lasting host (`docs/DEPLOY.md`)
+
+1. Move the database (or rebuild it and `experiment restore pilot1`) and keep the crawl queue.
+2. Run `scripts/pipeline.sh` until the queue is empty: about 240k sites, roughly 8 hours at ~500 sites/min.
+3. Grade electrical and auto repair samples once each has 300+ crawled sites (signal-change procedure).
+4. Back up Postgres daily (the suppression list lives there).
 
 ## Still open
 
