@@ -36,6 +36,9 @@ on conflict (business_id) do update set
   pain = excluded.pain, value = excluded.value, reachability = excluded.reachability, fit = excluded.fit,
   total = excluded.total, tier = excluded.tier, dead_reason = excluded.dead_reason,
   components = excluded.components, model_version = excluded.model_version, scored_at = now()
+-- Unchanged scores are left alone: rewriting all 726k rows every refresh only bloats the table.
+where (scores.total, scores.tier, scores.dead_reason, scores.components, scores.model_version)
+  is distinct from (excluded.total, excluded.tier, excluded.dead_reason, excluded.components, excluded.model_version)
 """
 
 DENORMALIZE = """

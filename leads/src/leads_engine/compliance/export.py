@@ -253,6 +253,9 @@ def check_all(url: str, cfg: AppConfig) -> dict[str, Any]:
         conn.execute(
             "update businesses b set compliance_status = g.status, compliance_blocks = g.blocks,"
             " compliance_checked_at = now() from stage_gate g where g.business_id = b.id"
+            # Only rows whose result changed: rewriting all 726k rows every refresh bloated the table.
+            " and (b.compliance_status is distinct from g.status"
+            "      or b.compliance_blocks is distinct from g.blocks)"
         )
     with psycopg.connect(url, autocommit=True) as c:
         c.execute("analyze businesses")
