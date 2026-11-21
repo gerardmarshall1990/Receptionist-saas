@@ -1,4 +1,4 @@
-"""Build the lead-list page's data file (leads.json) from a gated export.
+"""Build the lead-list page's data files (index.json + leads-NNN.json parts) from a gated export.
 
     uv run python scripts/build_lead_list.py [export_dir] [out_dir]
 
@@ -16,6 +16,7 @@ from pathlib import Path
 import pyarrow.parquet as pq
 
 ROOT = Path(__file__).resolve().parents[1]
+PART_SIZE = 5_000
 
 
 def clean(text: str | None) -> str | None:
@@ -67,14 +68,27 @@ def main() -> None:
         key=lambda x: -x["s"],
     )
     m = json.loads((src / "manifest.json").read_text())
-    head = {"export_id": m["export_id"], "attribution": m["attribution"], "counts": m["counts"],
-            "generated": m["created_at"]}  # fmt: skip
-    with (out / "leads.json").open("w", encoding="utf-8") as fh:
-        fh.write(json.dumps(head)[:-1] + ',"leads":[\n')
-        fh.write(",\n".join(json.dumps(x, ensure_ascii=False, separators=(",", ":")) for x in recs))
-        fh.write("\n]}\n")
+    # Parts of PART_SIZE leads: one published file must stay under 16 MB.
+    for old in out.glob("leads*.json"):
+        old.unlink()
+    parts = []
+    for i in range(0, len(recs), PART_SIZE):
+        name = f"leads-{i // PART_SIZE:03d}.json"
+        with (out / name).open("w", encoding="utf-8") as fh:
+            fh.write(
+                "[\n"
+                + ",\n".join(
+                    json.dumps(x, ensure_ascii=False, separators=(",", ":"))
+                    for x in recs[i : i + PART_SIZE]
+                )
+                + "\n]\n"
+            )
+        parts.append(name)
+    index = {"export_id": m["export_id"], "attribution": m["attribution"], "counts": m["counts"],
+             "generated": m["created_at"], "total": len(recs), "parts": parts}  # fmt: skip
+    (out / "index.json").write_text(json.dumps(index, indent=1), encoding="utf-8")
     shutil.copy(ROOT / "web" / "lead_list" / "index.html", out / "index.html")
-    print(f"{len(recs)} leads from {src.name} -> {out}")
+    print(f"{len(recs)} leads in {len(parts)} parts from {src.name} -> {out}")
 
 
 if __name__ == "__main__":

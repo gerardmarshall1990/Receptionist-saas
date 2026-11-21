@@ -222,8 +222,17 @@ function close() { selected = null; $("#sheet").hidden = true; render(); }
 
 async function init() {
   let res;
-  try { res = await fetch("leads.json"); if (!res.ok) throw new Error(res.status); DATA = await res.json(); }
-  catch (e) { $("#meta").textContent = "The lead file didn't load. Reload the page to try again."; return; }
+  try {
+    res = await fetch("index.json");
+    if (!res.ok) throw new Error(res.status);
+    DATA = await res.json();
+    const parts = await Promise.all(DATA.parts.map(async (name) => {
+      const r = await fetch(name);
+      if (!r.ok) throw new Error(r.status);
+      return r.json();
+    }));
+    DATA.leads = parts.flat();
+  } catch (e) { $("#meta").textContent = "The lead files didn't load. Reload the page to try again."; return; }
   const n = DATA.leads.length;
   $("#meta").textContent = `${fmt.format(n)} leads ready to call · export ${DATA.export_id.slice(0, 8)} · ${new Date(DATA.generated).toLocaleDateString()}`;
   const catCount = {};

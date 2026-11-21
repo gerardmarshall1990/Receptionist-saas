@@ -53,6 +53,7 @@ https://claude.ai/artifact/JvbTF3fXVsjukmnZmMDYZG
 | 13:17 UTC (v9, ~50k sites crawled) | 10,203 | 1,516 | 1,158 |
 | 13:49 UTC (after a container restart; pipeline resumed) | 11,422 | 1,652 | 1,302 |
 | 15:15 UTC | 12,629 | 1,798 | 1,448 |
+| 15:42 UTC | 15,323 | 2,128 | 1,784 |
 
 ## Why the crawl keeps pausing here
 
