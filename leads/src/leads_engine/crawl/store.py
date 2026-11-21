@@ -157,7 +157,7 @@ def _write(
 
 
 def run_extract(
-    url: str, cfg: AppConfig, data_dir: Path, full: bool = False, batch: int = 2_000
+    url: str, cfg: AppConfig, data_dir: Path, full: bool = False, batch: int = 8_000
 ) -> dict[str, int]:
     """Extract signals for finished sites. Incremental by default: only sites crawled since
     their last extraction, or extracted by an older EXTRACTOR_VERSION. Batches of `batch`
