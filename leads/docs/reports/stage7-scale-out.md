@@ -57,6 +57,7 @@ https://claude.ai/artifact/JvbTF3fXVsjukmnZmMDYZG
 | 15:42 UTC | 15,323 | 2,128 | 1,784 |
 | 16:11 UTC | 17,887 | 2,445 | 2,086 |
 | 17:03 UTC (v10) | 20,664 | 2,797 | 2,428 |
+| 18:04 UTC (v11; roofing arriving: 3,018 roofing leads) | 26,219 | 3,693 | 2,904 |
 
 ## Why the crawl keeps pausing here
 
@@ -67,6 +68,6 @@ advances while the session is active. That is the strongest reason for the lasti
 
 ## Still open
 
-- Accuracy samples for roofing, electrical and auto: there aren't enough crawled sites yet.
+- Accuracy samples for electrical and auto: there aren't enough crawled sites yet (roofing graded, v11).
 - Lasting host, so the crawl can go past the container's disk (`docs/DEPLOY.md`).
 - 3M target vs 7 categories.
