@@ -45,6 +45,7 @@ for ((w = 1; w <= WORKERS; w++)); do crawl_worker & pids+=($!); done
 trap 'kill "${pids[@]}" 2>/dev/null || true' EXIT
 
 running() { for p in "${pids[@]}"; do kill -0 "$p" 2>/dev/null && return 0; done; return 1; }
+refresh                                  # catch up straight away, then every MINUTES
 while running; do
   sleep $((MINUTES * 60))
   refresh
