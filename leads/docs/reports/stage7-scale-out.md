@@ -52,6 +52,14 @@ https://claude.ai/artifact/JvbTF3fXVsjukmnZmMDYZG
 | Round 2 (v8) | 8,028 | 1,245 | 883 |
 | 13:17 UTC (v9, ~50k sites crawled) | 10,203 | 1,516 | 1,158 |
 | 13:49 UTC (after a container restart; pipeline resumed) | 11,422 | 1,652 | 1,302 |
+| 15:15 UTC | 12,629 | 1,798 | 1,448 |
+
+## Why the crawl keeps pausing here
+
+This cloud container is reclaimed a few minutes after the session goes idle; Postgres and the pipeline stop
+with it. For example, after the 13:50 check-in the last crawl update was 13:54 and the container came back at 15:06.
+Nothing is lost (pages, queue and database survive; interrupted sites go back to `pending`), but the crawl only
+advances while the session is active. That is the strongest reason for the lasting host in `docs/DEPLOY.md`.
 
 ## Still open
 
