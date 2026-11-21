@@ -29,7 +29,9 @@ from leads_engine.universe import normalize as nz
 #     intake-form voicemail questions; "you can also fill out"; owner wording about clients or practice areas.
 # v10: name_not_on_site flag (listing name absent although the phone matches: e.g. an attorney's listing on
 #      another firm's site); "say if it is safe to leave a voicemail" is a form field.
-EXTRACTOR_VERSION = "stage2-v10"
+# v11: roofing sample: "$75K losses" is not a price (no K/M amounts); "500+ service trucks" / "250 technicians"
+#      is a large company (chain signal), like "N locations nationwide".
+EXTRACTOR_VERSION = "stage2-v11"
 SNIPPET = 300
 
 
@@ -183,11 +185,13 @@ FRANCHISE = _rx(
     r"locally owned (?:and operated )?franchise",
     # Scale that only chains/distributors have ("joining over 200 locations nationwide").
     r"(?:over |more than )?\d{2,}\+? (?:locations|offices|branches) (?:nationwide|across (?:the )?(?:us|u\.s\.|country|america))",
+    # Size no small business has: "500+ service trucks", "250 technicians".
+    r"(?:over |more than )?[1-9]\d{2,}\+?\s+(?:service )?(?:trucks|vans|vehicles|technicians|employees|team members)",
 )  # fmt: skip
 PRICING = _rx(
     # The price must follow the keyword directly ("from $99", "starting at just $150"); v5 allowed 20
     # characters in between and matched stories ("...from that job funded a $500 van").
-    r"(?:starting at|starts at|from|only|just|flat[- ]rate|special|coupon|price)[\s:]{0,3}(?:just |only )?\$\s?\d{2,5}(?![\d,])",
+    r"(?:starting at|starts at|from|only|just|flat[- ]rate|special|coupon|price)[\s:]{0,3}(?:just |only )?\$\s?\d{2,5}(?![\d,]|\s?[kKmM]\b)",
     r"\$\s?\d{2,5}(?:\.\d\d)?\s*(?:off|special|flat rate|service call|diagnostic|exam|cleaning)",
 )  # fmt: skip
 MULTI_LOCATION = _rx(

@@ -72,4 +72,12 @@ government hotlines are not a claim; intake-form questions ("May we leave a voic
 "you can also fill out" is another channel; owner wording about other businesses or a practice-area list is
 excluded; "Call 24/7" now counts like "Call us 24/7". Every miss is a regression test.
 
-Open: roofing, electrical and auto need their own sample once the crawl reaches them (fewer than 100 sites so far).
+**v9 spot check of 12 strong-evidence law leads:** 9/12 right. **v10 fixes:** "say if it is safe to leave a
+voicemail" is a form field; a new `name_not_on_site` flag catches listings whose phone matches but whose name
+isn't on the site (an attorney's listing on another firm's site). Those leads get no opener (0.6% of passing leads).
+
+**Roofing / restoration (1,394 sites, v10):** pages carry fewer signals. Emergency 6/6, owner-operated 4/4, pricing
+0/1 ("From $75K losses"). **v11 fixes:** no K/M amounts as prices; "500+ service trucks", "250 employees" mark a
+large company (chain signal), like "N locations nationwide".
+
+Open: electrical and auto still need their own sample (under 100 crawled sites each).

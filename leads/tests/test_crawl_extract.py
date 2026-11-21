@@ -560,3 +560,21 @@ def test_v10_name_not_on_site_and_form_voicemail_field() -> None:
         "Full name * Phone * The fastest way to reach you. Say if it is safe to leave a voicemail. Email *"
     )
     assert "leave_message_text" not in extract(form, BIZ, CFG).signals
+
+
+# v11: roofing / restoration sample.
+@pytest.mark.parametrize(
+    ("text", "signal", "expected"),
+    [
+        ("From $75K losses to multi-million-dollar claims, we've seen it all.", "pricing_hints", False),
+        ("Roof inspections starting at $99 this month.", "pricing_hints", True),
+        ("Founded in 1976. 24/7 emergency service. 500+ service trucks on the road.", "is_chain", True),
+        ("Our 12 technicians are licensed and insured.", "is_chain", False),
+        ("We have over 250 employees serving the region.", "is_chain", True),
+    ],
+)  # fmt: skip
+def test_v11_roofing_sample(text: str, signal: str, expected: bool) -> None:
+    assert (
+        signal
+        in extract(_p(text), {"name_key": "x", "category": "roofing_restoration"}, CFG).signals
+    ) is expected
