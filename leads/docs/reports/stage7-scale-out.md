@@ -58,6 +58,7 @@ https://claude.ai/artifact/JvbTF3fXVsjukmnZmMDYZG
 | 16:11 UTC | 17,887 | 2,445 | 2,086 |
 | 17:03 UTC (v10) | 20,664 | 2,797 | 2,428 |
 | 18:04 UTC (v11; roofing arriving: 3,018 roofing leads) | 26,219 | 3,693 | 2,904 |
+| 18:30 UTC (roofing 8,474) | 31,678 | 4,684 | 3,142 |
 
 ## Why the crawl keeps pausing here
 
