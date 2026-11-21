@@ -62,6 +62,7 @@ https://claude.ai/artifact/JvbTF3fXVsjukmnZmMDYZG
 | 19:40 UTC (v12; HVAC and dental arriving) | 34,914 | 5,262 | 3,346 |
 | 20:01 UTC (dental 5,396, HVAC 3,540) | 40,217 | 6,194 | 3,850 |
 | 20:29 UTC (dental 7,979, HVAC 4,083) | 43,384 | 6,763 | 4,204 |
+| 20:55 UTC (dental 10,082, HVAC 4,698) | 46,172 | 7,279 | 4,505 |
 
 ## Why the crawl keeps pausing here
 
