@@ -48,14 +48,31 @@ PAGE_SCHEMA = pa.schema(
 log = get_logger("crawl")
 
 
-def enqueue(url: str, scope: Literal["pilot", "all"] = "pilot") -> int:
+def enqueue(
+    url: str,
+    scope: Literal["pilot", "all"] = "pilot",
+    value_weights: dict[str, float] | None = None,
+) -> int:
+    """Queue one row per website. Priority = best business on the domain: category value,
+    a usable unshared phone, independent (few locations, not a chain). Claims go best-first."""
+    w = value_weights or {}
     with psycopg.connect(url, autocommit=True) as conn:
         cur = conn.execute(
-            "insert into crawl_sites (domain, start_url)"
-            " select domain, min(website) from businesses"
-            " where domain is not null and website is not null and (in_pilot_sample or %s)"
-            " group by domain on conflict (domain) do nothing",
-            (scope == "all",),
+            "insert into crawl_sites (domain, start_url, priority)"
+            " select b.domain, min(b.website), max("
+            "   100 * coalesce(v.weight, 0.5)"
+            "   + case when b.phone is not null and not ('shared_phone' = any(b.flags))"
+            "     then 20 else -100 end"  # no usable phone: can never be exported, so crawl last
+            "   + case when b.location_count <= 3 then 10 else 0 end"
+            "   - case when b.is_chain then 50 else 0 end)"
+            " from businesses b left join unnest(%s::text[], %s::real[]) as v(category, weight)"
+            "   on v.category = b.category"
+            " where b.domain is not null and b.website is not null and (b.in_pilot_sample or %s)"
+            " group by b.domain"
+            " on conflict (domain) do update set priority = excluded.priority"
+            "   where crawl_sites.status = 'pending'"
+            "   and crawl_sites.priority is distinct from excluded.priority",
+            (list(w), [float(x) for x in w.values()], scope == "all"),
         )
         return cur.rowcount
 
@@ -70,7 +87,7 @@ def claim(
         "   where (status = 'pending')"
         "      or (status = 'error' and attempts < %s and next_attempt_at <= now())"
         "      or (status = 'running' and locked_at < now() - %s::interval)"
-        "   order by domain for update skip locked limit %s)"
+        "   order by priority desc, domain for update skip locked limit %s)"
         " returning domain, start_url",
         (worker, max_attempts, LOCK_STALE, n),
     ).fetchall()

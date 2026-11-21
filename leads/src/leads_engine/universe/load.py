@@ -141,12 +141,25 @@ def load(url: str, built: Path, scope: Scope = "sample") -> dict[str, int]:
                          e["is_freemail"], e["domain_matches_site"], e["flags"]]
                     )  # fmt: skip
                     counts["emails"] += 1
-        # Mirror the scope: drop rows that left it, unless a later stage touched them.
+        # Mirror the scope: drop rows that left it, unless a later stage touched them
+        # (crawled, or referenced by an experiment, call outcome, export or suppression).
         cur.execute(
             "delete from businesses b where b.source = 'overture' and b.crawled_at is null"
             " and not exists (select 1 from stage_b s where s.source_id = b.source_id)"
+            " and not exists (select 1 from experiment_assignments a where a.business_id = b.id)"
+            " and not exists (select 1 from outcomes o where o.business_id = b.id)"
+            " and not exists (select 1 from export_items x where x.business_id = b.id)"
+            " and not exists (select 1 from suppression sp where sp.match_type = 'business_id'"
+            "                 and sp.match_value = b.id::text)"
         )
         counts["removed_not_in_scope"] = cur.rowcount
+        # Rows kept for history are flagged so the gate never exports them again.
+        cur.execute(
+            "update businesses b set flags = array_append(b.flags, 'not_in_latest_build')"
+            " where b.source = 'overture' and not ('not_in_latest_build' = any(b.flags))"
+            " and not exists (select 1 from stage_b s where s.source_id = b.source_id)"
+        )
+        counts["kept_not_in_latest_build"] = cur.rowcount
         cur.execute(
             "update businesses b set in_pilot_sample = false where b.source = 'overture'"
             " and b.in_pilot_sample"
@@ -154,6 +167,11 @@ def load(url: str, built: Path, scope: Scope = "sample") -> dict[str, int]:
         )
         counts["unmarked_not_in_scope"] = cur.rowcount
         cur.execute(_merge_sql())
+        cur.execute(
+            "update businesses b set flags = array_remove(b.flags, 'not_in_latest_build')"
+            " where 'not_in_latest_build' = any(b.flags)"
+            " and exists (select 1 from stage_b s where s.source_id = b.source_id)"
+        )
     with psycopg.connect(url, autocommit=True) as conn:
         conn.execute("analyze businesses; analyze phones; analyze emails")
     return counts

@@ -20,8 +20,10 @@ REPORTS_DIR = PROJECT_ROOT / "docs" / "reports"
 
 def cmd_enqueue(args: argparse.Namespace) -> int:
     s = get_settings()
-    n = runner.enqueue(s.database_url, "all" if args.all else "pilot")
-    print(f"enqueued {n} new sites")
+    cfg = load_config(s.config_dir)
+    weights = {slug: c.value_weight for slug, c in cfg.categories.items()}
+    n = runner.enqueue(s.database_url, "all" if args.all else "pilot", weights)
+    print(f"enqueued or re-prioritised {n} sites (best first)")
     return 0
 
 
@@ -53,7 +55,7 @@ def cmd_extract(args: argparse.Namespace) -> int:
     cfg = load_config(s.config_dir)
     with recorded_run(s.database_url, "stage2.extract", cfg.config_hash, dry_run=False,
                       budget_usd=s.run_budget_usd) as run:  # fmt: skip
-        run.counts = run_extract(s.database_url, cfg, s.data_dir)
+        run.counts = run_extract(s.database_url, cfg, s.data_dir, full=args.full)
     print(f"extract: {json.dumps(run.counts, indent=1)}")
     return 0
 
@@ -94,6 +96,11 @@ def add_parser(groups: Any) -> None:
     r.add_argument("--max-sites", type=int, default=1000)
     r.add_argument("--minutes", type=float, default=120)
     r.add_argument("--dry-run", action="store_true")
-    c.add_parser("extract", help="signals/emails/phones from saved pages (no network)")
+    ex = c.add_parser(
+        "extract", help="signals/emails/phones from saved pages (no network; incremental)"
+    )
+    ex.add_argument(
+        "--full", action="store_true", help="re-extract every finished site, not just new ones"
+    )
     c.add_parser("status", help="queue counts")
     c.add_parser("report", help="write docs/reports/stage2-crawl-pilot.md")

@@ -1,6 +1,6 @@
 # Stage 5 compliance gate (spec section 7). An ENGINEERING gate, not legal advice:
 # counsel must review before calling at scale. Bump `version` on any change.
-version: 2
+version: 3
 
 # Who places the calls. "human": a person dials (pilot). "ai_voice": an AI/artificial
 # voice dials; then only line types in `ai_voice_line_types` may pass (FCC 2024: AI
@@ -17,14 +17,14 @@ export:
   # Phone flags from normalization; any "foreign:XX" flag also blocks.
   blocked_phone_flags: [invalid, unparseable, toll_free, premium_rate, shared_cost, suspicious]
   # Business flags that make the listed contact unsafe to use.
-  blocked_business_flags: [shared_phone, website_mismatch, phone_not_on_site, no_state]
+  blocked_business_flags: [shared_phone, website_mismatch, phone_not_on_site, no_state, not_in_latest_build]
 
 # Stage 6 control arm ("a random, unscored list"). Uses NO score information: no tier,
 # reason or disqualifier rules, and the phone only needs to be a valid listed number
 # (Overture), not confirmed on the site. Every safety rule above still applies.
 control:
   min_phone_status: unverified
-  blocked_business_flags: [shared_phone, no_state]   # set at Stage 1 for every business
+  blocked_business_flags: [shared_phone, no_state, not_in_latest_build]   # set at Stage 1 for every business
 
 countries:
   US:

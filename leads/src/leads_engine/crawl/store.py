@@ -37,22 +37,25 @@ log = get_logger("extract")
 TERMINAL = ("done", "blocked", "robots_disallowed", "parked", "offsite", "error")
 
 
-def _pages_by_domain(pages_dir: Path) -> dict[str, list[dict[str, Any]]]:
+def _pages_by_domain(
+    pages_dir: Path, domains: list[str] | None = None
+) -> dict[str, list[dict[str, Any]]]:
+    """Latest copy of each page, for the given domains only (constant memory per batch)."""
     files = sorted(pages_dir.glob("*.parquet"))
     if not files:
         return {}
-    q = """
+    where = "where domain in (select unnest($domains))" if domains is not None else ""
+    # `where` is one of two constants; domains and files are bound parameters.
+    q = f"""
     select domain, url, final_url, kind, content_type, html_gz from (
       select *, row_number() over (partition by domain, url order by fetched_at desc) as rn
-      from read_parquet($files, union_by_name = true)
+      from read_parquet($files, union_by_name = true) {where}
     ) where rn = 1
     """
-    rows = (
-        duckdb.connect()
-        .sql(q, params={"files": [str(f) for f in files]})
-        .to_arrow_table()
-        .to_pylist()
-    )
+    params: dict[str, Any] = {"files": [str(f) for f in files]}
+    if domains is not None:
+        params["domains"] = domains
+    rows = duckdb.connect().sql(q, params=params).to_arrow_table().to_pylist()
     out: dict[str, list[dict[str, Any]]] = defaultdict(list)
     order = {"home": 0, "contact": 1, "booking": 2, "careers": 3, "about": 4, "services": 5}
     for r in rows:
@@ -153,43 +156,71 @@ def _write(
     )
 
 
-def run_extract(url: str, cfg: AppConfig, data_dir: Path) -> dict[str, int]:
-    pages = _pages_by_domain(data_dir / "crawl" / "pages")
+def run_extract(
+    url: str, cfg: AppConfig, data_dir: Path, full: bool = False, batch: int = 2_000
+) -> dict[str, int]:
+    """Extract signals for finished sites. Incremental by default: only sites crawled since
+    their last extraction, or extracted by an older EXTRACTOR_VERSION. Batches of `batch`
+    domains keep memory flat however many sites have been crawled."""
     counts: dict[str, int] = defaultdict(int)
     with psycopg.connect(url, row_factory=dict_row) as conn:
         sites = conn.execute(
             "select domain, status from crawl_sites where status = any(%s)"
-            " and not (status = 'error' and attempts < %s)",
-            (list(TERMINAL), cfg.crawl.max_attempts),
+            " and not (status = 'error' and attempts < %s)"
+            " and (%s or extracted_version is distinct from %s or extracted_at is null"
+            "      or extracted_at < updated_at)"
+            " order by domain",
+            (list(TERMINAL), cfg.crawl.max_attempts, full, EXTRACTOR_VERSION),
         ).fetchall()
-        for site in sites:
-            domain, status = site["domain"], site["status"]
-            businesses = conn.execute(
-                "select id, name, name_key, category, phone, domain, flags, is_chain from businesses"
-                " where domain = %s",
-                (domain,),
-            ).fetchall()
-            try:
-                parsed = [
-                    parse(decode(gzip.decompress(p["html_gz"]), p["content_type"]), p["final_url"])
-                    for p in pages.get(domain, [])
-                ]
-                exs = [
-                    extract(parsed, b, cfg) if status in {"done", "offsite"} else Extraction()
-                    for b in businesses
-                ]
-            except Exception as exc:  # one odd page must not stop the pass; it is counted
-                log.error("extract_failed", domain=domain, error=f"{type(exc).__name__}: {exc}")
-                counts["extract_errors"] += 1
-                continue
-            with conn.transaction(), conn.cursor() as cur:
-                for b, ex in zip(businesses, exs, strict=True):
-                    _write(cur, b, ex, cfg, status)
-                    counts["businesses"] += 1
-                    counts[f"site_{status}"] += 1
-                    for name, hit in ex.signals.items():
-                        if hit.value:
-                            counts[f"signal:{name}"] += 1
-                    counts["with_site_email"] += bool(ex.emails)
+        counts["sites_to_extract"] = len(sites)
+        for i in range(0, len(sites), batch):
+            chunk = sites[i : i + batch]
+            pages = _pages_by_domain(data_dir / "crawl" / "pages", [s["domain"] for s in chunk])
+            _extract_chunk(conn, chunk, pages, cfg, counts)
+            conn.execute(
+                "update crawl_sites set extracted_version = %s, extracted_at = now()"
+                " where domain = any(%s)",
+                (EXTRACTOR_VERSION, [s["domain"] for s in chunk]),
+            )
+            conn.commit()
+            log.info("extract_progress", done=min(i + batch, len(sites)), total=len(sites))
         conn.execute("analyze signals; analyze reasons")
     return dict(counts)
+
+
+def _extract_chunk(
+    conn: psycopg.Connection[dict[str, Any]],
+    sites: list[dict[str, Any]],
+    pages: dict[str, list[dict[str, Any]]],
+    cfg: AppConfig,
+    counts: dict[str, int],
+) -> None:
+    for site in sites:
+        domain, status = site["domain"], site["status"]
+        businesses = conn.execute(
+            "select id, name, name_key, category, phone, domain, flags, is_chain from businesses"
+            " where domain = %s",
+            (domain,),
+        ).fetchall()
+        try:
+            parsed = [
+                parse(decode(gzip.decompress(p["html_gz"]), p["content_type"]), p["final_url"])
+                for p in pages.get(domain, [])
+            ]
+            exs = [
+                extract(parsed, b, cfg) if status in {"done", "offsite"} else Extraction()
+                for b in businesses
+            ]
+        except Exception as exc:  # one odd page must not stop the pass; it is counted
+            log.error("extract_failed", domain=domain, error=f"{type(exc).__name__}: {exc}")
+            counts["extract_errors"] += 1
+            continue
+        with conn.transaction(), conn.cursor() as cur:
+            for b, ex in zip(businesses, exs, strict=True):
+                _write(cur, b, ex, cfg, status)
+                counts["businesses"] += 1
+                counts[f"site_{status}"] += 1
+                for name, hit in ex.signals.items():
+                    if hit.value:
+                        counts[f"signal:{name}"] += 1
+                counts["with_site_email"] += bool(ex.emails)

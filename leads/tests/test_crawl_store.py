@@ -133,7 +133,15 @@ def test_crawl_and_extract_end_to_end(fresh_db: str, site: Site, tmp_path: Path)
             )
 
     before = snapshot()
-    run_extract(fresh_db, CFG, tmp_path)
+    # Incremental by default: nothing was crawled since, so nothing is re-extracted.
+    assert run_extract(fresh_db, CFG, tmp_path)["sites_to_extract"] == 0
+    # A site crawled again (updated after its extraction) is picked up, and only that one.
+    with psycopg.connect(fresh_db, autocommit=True) as conn:
+        conn.execute("update crawl_sites set updated_at = now() + interval '1 second'"
+                     " where domain = (select domain from crawl_sites where status = 'done' limit 1)")  # fmt: skip
+    assert run_extract(fresh_db, CFG, tmp_path)["sites_to_extract"] == 1
+    # A full pass converges: same row counts, nothing duplicated.
+    run_extract(fresh_db, CFG, tmp_path, full=True)
     assert snapshot() == before
 
 
