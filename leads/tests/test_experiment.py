@@ -286,3 +286,54 @@ def test_call_list_has_no_column_that_differs_by_arm() -> None:
     assert not {"website", "email", "tier", "score", "arm", "opener", "why_reasons"} & set(
         CALL_LIST_FIELDS
     )
+
+
+@pytest.mark.db
+@needs_db
+def test_snapshot_restores_the_frozen_experiment_on_a_fresh_db(
+    fresh_db: str, tmp_path: Path
+) -> None:
+    from leads_engine.experiment.snapshot import restore, snapshot
+
+    _seed(fresh_db, tmp_path)
+    create(fresh_db, CFG, "t1", "seed-1", tmp_path / "exp", per_arm=4)
+    with psycopg.connect(fresh_db) as c:
+        before = c.execute(
+            "select b.source_id, a.arm, a.call_order from experiment_assignments a join businesses b"
+            " on b.id = a.business_id order by a.call_order"
+        ).fetchall()
+    first = before[0][0]
+    with psycopg.connect(fresh_db) as c:
+        found = c.execute("select id from businesses where source_id = %s", (first,)).fetchone()
+    assert found is not None
+    lead = str(found[0])
+    import_csv(fresh_db, "t1", _write_outcomes(tmp_path / "o.csv", [
+        [lead, "2026-12-01T09:30:00-06:00", "al", "do_not_call", "", "", "", "private note"]]), "dialer-x", 3)  # fmt: skip
+    snap = snapshot(fresh_db, "t1", tmp_path / "snap")
+    text = "".join(f.read_text() for f in snap.iterdir())
+    assert "private note" not in text  # free-text notes stay out of git
+    assert "+1" not in text  # no phone numbers
+
+    # Same universe, new database (new business UUIDs): restore maps by source ID.
+    with psycopg.connect(fresh_db, autocommit=True) as c:
+        base, _, _ = fresh_db.rpartition("/")
+        c.execute("create database leads_t_restore template template0")
+    other = f"{base}/leads_t_restore"
+    try:
+        _seed(other, tmp_path / "b")
+        res = restore(other, snap)
+        assert res["assignments"] == 8
+        assert res["suppression_rows_added"] == 2  # the opt-out survives the rebuild
+        with psycopg.connect(other) as c:
+            after = c.execute(
+                "select b.source_id, a.arm, a.call_order from experiment_assignments a join businesses b"
+                " on b.id = a.business_id order by a.call_order"
+            ).fetchall()
+        assert after == before
+        with pytest.raises(ValueError, match="already exists"):
+            restore(other, snap)
+    finally:
+        with psycopg.connect(
+            fresh_db.rpartition("/")[0] + "/frontdesk_leads_test", autocommit=True
+        ) as c:
+            c.execute("drop database if exists leads_t_restore with (force)")

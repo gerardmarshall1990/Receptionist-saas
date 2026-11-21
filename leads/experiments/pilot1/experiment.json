@@ -1,0 +1,33 @@
+{
+  "assignments": 2000,
+  "config_hash": "5d9a8d373c972995",
+  "created_at": "2026-11-21T09:00:26.092114+00:00",
+  "name": "pilot1",
+  "outcomes": 0,
+  "params": {
+    "alpha": 0.05,
+    "compliance_version": 2,
+    "max_attempts": 3,
+    "min_dialed_per_arm": 300,
+    "openers_in_call_list": false,
+    "per_arm": 1000,
+    "pool_sizes": {
+      "control": 223723,
+      "scored": 3670
+    },
+    "power": 0.8,
+    "primary_metric": "demo",
+    "quotas": {
+      "dental": 321,
+      "hvac": 311,
+      "plumbing": 368
+    },
+    "scored_tiers": [
+      "A",
+      "B"
+    ],
+    "version": 1
+  },
+  "seed": "pilot1-2026-11-21",
+  "status": "locked"
+}

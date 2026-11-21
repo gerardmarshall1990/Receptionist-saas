@@ -22,8 +22,8 @@ Read first: `docs/MASTER-SPEC.md` (the spec), `docs/ICP.md` (who we target), `do
 One stage at a time (spec §9): explore -> plan -> **wait for approval** -> implement with tests -> verify -> report
 (done / tested / untested / gaps / open questions) -> **wait for "verified"**. Commit after each green stage. Ask before adding scope.
 
-Current status: **Stage 6 (pilot experiment) in review**: pilot1 locked, call list ready, readout waits for
-call outcomes. Stages 0, 1, 1b, 2, 4, 5 verified; Stage 3 redirected (no paid phone lookups).
+Current status: **Stage 6 verified (set-up); waiting for pilot1 call outcomes.** Stage 7 (scale-out) is decided
+by the pilot1 readout. Stages 0, 1, 1b, 2, 4, 5 verified; Stage 3 redirected (no paid phone lookups).
 Reports: `docs/reports/stage1-pilot-*.md`, `explorer-benchmark.md`, `stage2-crawl-pilot.md`, `stage2-precision.md`,
 `stage4-scoring-pilot.md`, `stage5-export.md`, `stage6-pilot-setup.md`, `stage6-readout-pilot1.md`.
 
@@ -94,6 +94,8 @@ uv run leads experiment call-list pilot1   # refresh: drops anyone suppressed si
 uv run leads outcomes import calls.csv --experiment pilot1 --source dialer   # one row per attempt
 uv run leads experiment readout pilot1     # docs/reports/stage6-readout-pilot1.md
 uv run leads experiment list
+uv run leads experiment snapshot pilot1    # experiments/pilot1/ (auto after create + every import): COMMIT IT
+uv run leads experiment restore pilot1     # fresh DB (same Overture release loaded): re-creates arms + outcomes
 
 # browser test (needs node + playwright; runs inside pytest when TEST_DATABASE_URL is set)
 LEADS_E2E_SCREENSHOTS=/some/dir uv run pytest tests/test_explorer_e2e.py -s
@@ -136,6 +138,7 @@ src/leads_engine/scoring/     prescore.py (pure score + components), run.py (str
 src/leads_engine/universe/    overture.py (remote read), normalize.py (pure), build.py (exclude/chain/dedupe/
                               sample), load.py (Postgres upsert), report.py, pipeline.py (paths + steps)
 migrations/NNN_*.sql          applied in order, each in a transaction, tracked in schema_migrations
+experiments/<name>/           committed experiment record: source IDs, arms, outcomes (no contact data, no notes)
 data/                         raw/derived bulk files (Parquet). Gitignored. Never commit data.
 ```
 
@@ -171,6 +174,7 @@ data/                         raw/derived bulk files (Parquet). Gitignored. Neve
 - **Experiments:** assignments are frozen (DB trigger) and the call list never shows arm, tier, score, reasons,
   openers or any column that differs by arm. The explorer shows call history, never the arm. Change one
   variable per experiment; the verdict rule (min n, alpha) is set before calling, in `config/experiment.yaml`.
+  The database is ephemeral here: commit `experiments/<name>/` after every create and outcomes import.
 - **Overture release** is pinned in `global.yaml`. Bumping it requires `leads universe census` and re-confirming codes.
 - **Tests that need fixtures** (saved HTML etc.) go in `tests/fixtures/`. Never hit the network in tests.
 

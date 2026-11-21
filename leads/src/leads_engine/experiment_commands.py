@@ -12,6 +12,15 @@ import psycopg
 from leads_engine.config_loader import load_config
 from leads_engine.settings import PROJECT_ROOT, get_settings
 
+# Committed to git (not data/): the durable record of each experiment. IDs only, no contact data.
+SNAPSHOT_ROOT = PROJECT_ROOT / "experiments"
+
+
+def _snap(url: str, name: str) -> Path:
+    from leads_engine.experiment.snapshot import snapshot
+
+    return snapshot(url, name, SNAPSHOT_ROOT)
+
 
 def _create(args: argparse.Namespace) -> int:
     from leads_engine.experiment.assign import create
@@ -37,6 +46,7 @@ def _create(args: argparse.Namespace) -> int:
         f"pools: scored {res['pool_scored']:,}, control {res['pool_control']:,}; scored tiers {res['scored_tiers']}"
     )
     print(f"call list: {res['path']}/call_list.csv (protocol: PROTOCOL.md)")
+    print(f"snapshot (commit this): {_snap(s.database_url, args.name)}")
     return 0
 
 
@@ -61,6 +71,22 @@ def _import(args: argparse.Namespace) -> int:
     )
     for k, v in counts.items():
         print(f"  {k:<28} {v:>7,}")
+    print(f"snapshot refreshed (commit this): {_snap(s.database_url, args.experiment)}")
+    return 0
+
+
+def _snapshot(args: argparse.Namespace) -> int:
+    print(f"snapshot: {_snap(get_settings().database_url, args.name)}")
+    return 0
+
+
+def _restore(args: argparse.Namespace) -> int:
+    from leads_engine.experiment.snapshot import restore
+
+    res = restore(
+        get_settings().database_url, Path(args.dir) if args.dir else SNAPSHOT_ROOT / args.name
+    )
+    print(f"restored: {res}")
     return 0
 
 
@@ -95,6 +121,8 @@ COMMANDS: dict[tuple[str, str], Callable[[argparse.Namespace], int]] = {
     ("experiment", "call-list"): _call_list,
     ("experiment", "readout"): _readout,
     ("experiment", "list"): _list,
+    ("experiment", "snapshot"): _snapshot,
+    ("experiment", "restore"): _restore,
     ("outcomes", "import"): _import,
 }
 
@@ -112,6 +140,15 @@ def add_parser(groups: Any) -> None:
     ro = ep.add_parser("readout", help="write docs/reports/stage6-readout-<name>.md")
     ro.add_argument("name")
     ep.add_parser("list", help="experiments and logged attempts")
+    sn = ep.add_parser(
+        "snapshot", help="write experiments/<name>/ (IDs, arms, outcomes; commit it)"
+    )
+    sn.add_argument("name")
+    rs = ep.add_parser(
+        "restore", help="re-create a frozen experiment from its snapshot on a fresh DB"
+    )
+    rs.add_argument("name")
+    rs.add_argument("--dir", help="snapshot directory (default experiments/<name>)")
     op = groups.add_parser("outcomes", help="Stage 6: call outcomes").add_subparsers(
         dest="command", required=True
     )

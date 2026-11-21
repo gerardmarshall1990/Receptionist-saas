@@ -2,6 +2,16 @@
 
 Newest first. One entry per decision that someone might later ask "why?" about.
 
+## 2026-11-21 — Experiment records are committed to git
+
+The container (and its Postgres) is ephemeral, and pilot1's frozen assignment must outlive it. `experiments/<name>/`
+holds the minimum to reproduce it: Overture source IDs (stable within the pinned release), arm, call order, seed,
+params, config hash, and call outcomes without free-text notes. No names, phones or emails. This is a narrow
+exception to "never commit data": it is the experiment's record, not bulk data. `restore` re-creates the
+experiment on a fresh database and re-applies opt-outs logged as `do_not_call`. Callers work from the call list,
+not the repo; the arm column in the snapshot is not shown to them. The full suppression table still lives only
+in Postgres until there is a lasting host.
+
 ## 2026-11-21 — Stage 6 (pilot experiment)
 
 User took the recommended option on all four:
