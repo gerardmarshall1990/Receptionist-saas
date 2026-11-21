@@ -26,7 +26,8 @@ About 447k new websites queued. Priority = category value weight + usable unshar
 site without a usable phone goes last because it can never become an exportable lead. So law firms (0.95) come
 first, then roofing (0.90), then HVAC and dental (0.85).
 
-- Speed: ~10k sites per 20-minute round with 2 workers, plus incremental extraction.
+- Speed: ~600 sites/min crawled by 2 continuous workers; extraction runs in parallel (~3,000 sites/min)
+  every 20 minutes without pausing the crawl (`scripts/pipeline.sh`).
 - Disk: saved pages ~66 KB per site. This container stops at 6 GB free, which is roughly the best 200k sites.
   The rest needs the lasting host in `docs/DEPLOY.md`.
 
@@ -49,6 +50,7 @@ https://claude.ai/artifact/JvbTF3fXVsjukmnZmMDYZG
 |---|---:|---:|---:|
 | Start (3 categories) | 3,670 | 691 | — |
 | Round 2 (v8) | 8,028 | 1,245 | 883 |
+| 13:17 UTC (v9, ~50k sites crawled) | 10,203 | 1,516 | 1,158 |
 
 ## Still open
 
