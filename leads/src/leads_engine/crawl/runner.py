@@ -80,17 +80,25 @@ def enqueue(
 def claim(
     conn: psycopg.Connection[Any], worker: str, n: int, max_attempts: int
 ) -> list[tuple[str, str]]:
-    rows = conn.execute(
+    """Claim up to n sites, best first. Two index-friendly steps: pending sites by priority
+    (crawl_sites_claim_idx), then retryable errors and stale locks. A single OR query can't use
+    the index and scans the whole queue on every claim, which stalls workers at scale."""
+    take = (
         "update crawl_sites set status = 'running', locked_by = %s, locked_at = now(),"
         " attempts = attempts + 1, updated_at = now()"
-        " where domain in (select domain from crawl_sites"
-        "   where (status = 'pending')"
-        "      or (status = 'error' and attempts < %s and next_attempt_at <= now())"
-        "      or (status = 'running' and locked_at < now() - %s::interval)"
+        " where domain in (select domain from crawl_sites where {cond}"
         "   order by priority desc, domain for update skip locked limit %s)"
-        " returning domain, start_url",
-        (worker, max_attempts, LOCK_STALE, n),
-    ).fetchall()
+        " returning domain, start_url"
+    )
+    rows = conn.execute(take.format(cond="status = 'pending'"), (worker, n)).fetchall()
+    if len(rows) < n:
+        rows += conn.execute(
+            take.format(
+                cond="(status = 'error' and attempts < %s and next_attempt_at <= now())"
+                " or (status = 'running' and locked_at < now() - %s::interval)"
+            ),
+            (worker, max_attempts, LOCK_STALE, n - len(rows)),
+        ).fetchall()
     return [(r[0], r[1]) for r in rows]
 
 

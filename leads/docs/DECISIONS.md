@@ -2,6 +2,24 @@
 
 Newest first. One entry per decision that someone might later ask "why?" about.
 
+## 2026-11-21 — Stage 7 database build starts before the pilot readout
+
+User: "go ahead as per most efficient route. I need to see list pretty soon so keep going until done as per my
+specs." Building the database is open data and $0, so it goes ahead now; decisions about **calling** at scale
+still wait for the pilot1 readout.
+- **All 7 categories, US:** 930,691 raw -> 725,895 kept and loaded. The reload found 530 existing rows that the
+  wider build reclassifies (306 now visible as chain locations, 224 duplicates). Rows nothing references are
+  removed; rows referenced by pilot1 or exports are kept and flagged `not_in_latest_build`, which the gate blocks.
+- **Best-first crawl:** priority = category value + usable unshared phone + independent; a site with no usable
+  phone goes last because it can never become an exportable lead.
+- **Disk bounds the crawl here:** saved pages take ~78 KB per site, about 35 GB for all 447k new sites, against
+  ~20 GB free. The loop stops at 6 GB free, so this container covers roughly the best 150k sites. The rest needs
+  a lasting host (or dropping saved HTML after extraction, which would end re-extraction when rules improve).
+- **Incremental extraction:** only sites crawled since their last pass (or extracted by an older version), in
+  batches, so cost tracks new sites rather than the whole crawl.
+- **The lead list is published as a private claude.ai page** from each gated export, so it can be seen without
+  hosting the explorer.
+
 ## 2026-11-21 — Experiment records are committed to git
 
 The container (and its Postgres) is ephemeral, and pilot1's frozen assignment must outlive it. `experiments/<name>/`

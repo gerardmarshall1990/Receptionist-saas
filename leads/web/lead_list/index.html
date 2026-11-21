@@ -1,0 +1,239 @@
+<title>Frontdesk Lead List</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: sticky toolbar, filter row, scrolling lead list; detail sheet slides in on the right (full screen on phones). */
+:root {
+  --bg: #f6f7fb; --panel: #ffffff; --panel-2: #eef1f8; --fg: #171a23; --muted: #5d6475; --border: #dde1ec;
+  --accent: #2f5bea; --accent-soft: #e8eefe; --good: #137a4b; --good-soft: #e3f4ea; --warn: #8a5a00; --warn-soft: #fbf0d9;
+  --tierA: #137a4b; --tierB: #2f5bea;
+  --f-display: "Space Grotesk", "Inter", system-ui, sans-serif;
+  --f-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f121a; --panel: #161a24; --panel-2: #1d2230; --fg: #e8ebf3; --muted: #9aa2b5; --border: #2a3142;
+  --accent: #7c9bff; --accent-soft: #1f2a4a; --good: #5fd39a; --good-soft: #16301f; --warn: #f0c060; --warn-soft: #33290f;
+  --tierA: #5fd39a; --tierB: #7c9bff; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0f121a; --panel: #161a24; --panel-2: #1d2230; --fg: #e8ebf3; --muted: #9aa2b5; --border: #2a3142;
+  --accent: #7c9bff; --accent-soft: #1f2a4a; --good: #5fd39a; --good-soft: #16301f; --warn: #f0c060; --warn-soft: #33290f;
+  --tierA: #5fd39a; --tierB: #7c9bff; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font: 14px/1.45 var(--f-body); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--panel); }
+.wrap { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+header.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--panel); border-bottom: 1px solid var(--border); }
+.top-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; padding-block: 14px 10px; }
+h1 { font: 600 20px/1.2 var(--f-display); margin: 0; text-wrap: balance; }
+h1 .mark { color: var(--accent); }
+.meta { color: var(--muted); font-size: 13px; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; padding-block: 0 12px; align-items: center; }
+input[type=search], select { font: inherit; color: var(--fg); background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; }
+input[type=search] { flex: 1 1 240px; min-width: 0; }
+input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.seg button { font: inherit; background: var(--panel); color: var(--fg); border: 0; padding: 6px 11px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--border); }
+.seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.chk { display: inline-flex; gap: 6px; align-items: center; color: var(--muted); font-size: 13px; cursor: pointer; }
+.chk input { accent-color: var(--accent); }
+.summary { display: flex; flex-wrap: wrap; gap: 6px 18px; padding-block: 10px; color: var(--muted); font-size: 13px; }
+.summary b { color: var(--fg); font-variant-numeric: tabular-nums; font-weight: 600; }
+main { padding-block: 0 40px; }
+.list { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.row { display: grid; grid-template-columns: 52px minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, 1.4fr); gap: 12px; align-items: center;
+  padding: 11px 14px; border-top: 1px solid var(--border); cursor: pointer; }
+.row:first-child { border-top: 0; }
+.row:hover, .row.sel { background: var(--panel-2); }
+.row.head { cursor: default; background: var(--panel-2); color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; font-weight: 600; }
+.name { font-weight: 600; overflow-wrap: anywhere; }
+.sub { color: var(--muted); font-size: 12.5px; }
+.mono { font-family: var(--f-mono); font-size: 13px; font-variant-numeric: tabular-nums; }
+.tier { display: inline-grid; place-items: center; min-width: 22px; height: 22px; border-radius: 6px; font: 600 12px var(--f-display); color: var(--panel); }
+.tier-A { background: var(--tierA); } .tier-B { background: var(--tierB); }
+.score { display: flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; }
+.pills { display: flex; flex-wrap: wrap; gap: 4px; }
+.pill { font-size: 11.5px; padding: 1px 7px; border-radius: 999px; background: var(--panel-2); color: var(--muted); white-space: nowrap; }
+.pill.ok { background: var(--good-soft); color: var(--good); }
+.pill.ac { background: var(--accent-soft); color: var(--accent); }
+.more { display: flex; justify-content: center; padding: 14px; }
+.btn { font: inherit; cursor: pointer; border: 1px solid var(--border); background: var(--panel); color: var(--fg); border-radius: 8px; padding: 7px 14px; }
+.btn:hover { background: var(--panel-2); }
+.btn.sm { padding: 3px 9px; font-size: 12.5px; }
+.empty { padding: 30px; text-align: center; color: var(--muted); }
+/* detail sheet */
+.sheet { position: fixed; top: 0; right: 0; bottom: 0; width: min(560px, 100%); background: var(--panel); border-left: 1px solid var(--border); z-index: 20;
+  overflow-y: auto; padding: calc(env(safe-area-inset-top, 0px) + 18px) max(20px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 28px) 20px;
+  box-shadow: -12px 0 32px rgb(0 0 0 / .12); }
+.sheet h2 { font: 600 19px/1.25 var(--f-display); margin: 0 36px 2px 0; text-wrap: balance; }
+.close { position: absolute; top: calc(env(safe-area-inset-top, 0px) + 14px); right: max(14px, env(safe-area-inset-right, 0px)); width: 32px; height: 32px; }
+.sec { margin-top: 18px; display: grid; gap: 8px; }
+.sec h3 { margin: 0; font: 600 11.5px var(--f-body); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.kv { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 6px 12px; align-items: center; }
+.kv dt { color: var(--muted); font-size: 13px; } .kv dd { margin: 0; overflow-wrap: anywhere; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.opener { padding: 12px 14px; border-radius: 8px; background: var(--accent-soft); }
+.opener q { font-style: italic; }
+.reason { padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; display: grid; gap: 4px; }
+.reason q { color: var(--muted); font-size: 13px; }
+.reason a, a { color: var(--accent); text-decoration: none; } a:hover { text-decoration: underline; }
+.note { color: var(--muted); font-size: 12.5px; }
+footer { color: var(--muted); font-size: 12px; padding-block: 0 30px; display: grid; gap: 4px; }
+@media (max-width: 760px) {
+  .row { grid-template-columns: 44px minmax(0, 1fr); }
+  .row .c3, .row .c4, .row .c5 { grid-column: 2; }
+  .row.head { display: none; }
+}
+@media (prefers-reduced-motion: no-preference) { .sheet { animation: slide .18s ease-out; } @keyframes slide { from { transform: translateX(24px); opacity: .6; } } }
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <div class="top-row">
+      <h1><span class="mark">◆</span> Frontdesk Lead List</h1>
+      <span class="meta" id="meta">Loading leads…</span>
+    </div>
+    <div class="controls">
+      <input type="search" id="q" placeholder="Search name, city, state or phone" aria-label="Search leads" autocomplete="off">
+      <div class="seg" role="group" aria-label="Category" id="cat"></div>
+      <div class="seg" role="group" aria-label="Tier" id="tier"></div>
+      <select id="state" aria-label="State"><option value="">All states</option></select>
+      <label class="chk"><input type="checkbox" id="hasEmail"> Has email</label>
+      <label class="chk"><input type="checkbox" id="hasOpener"> Has opener</label>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="summary" id="summary"></div>
+  <div class="list" id="list" role="list"></div>
+  <div class="more"><button class="btn" id="more" hidden>Show 100 more</button></div>
+  <footer id="foot"></footer>
+</main>
+
+<aside class="sheet" id="sheet" hidden aria-label="Lead detail"></aside>
+
+<script>
+const $ = (s) => document.querySelector(s);
+function el(tag, attrs = {}, ...kids) {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (v == null || v === false) continue;
+    if (k === "class") n.className = v; else if (k.startsWith("on")) n.addEventListener(k.slice(2), v); else n.setAttribute(k, v);
+  }
+  for (const k of kids.flat()) if (k != null && k !== false) n.append(k.nodeType ? k : document.createTextNode(String(k)));
+  return n;
+}
+const fmt = new Intl.NumberFormat();
+const SIGNAL = {
+  leave_message_text: "Sends callers to voicemail", hiring_receptionist: "Hiring someone for the phones",
+  phone_only_booking: "Booking by phone only", limited_hours_text: "Limited opening hours",
+  emergency_247_claim: "Advertises emergency / 24-7 service", single_phone_number: "One phone line",
+  no_online_booking: "No online booking", no_chat_widget: "No website chat", pricing_hints: "Publishes prices",
+  multiple_locations: "More than one location", owner_operated: "Owner / family operated", review_hard_to_reach: "Review says hard to reach",
+};
+const label = (g) => SIGNAL[g] || g.replaceAll("_", " ");
+function phoneText(e) { const m = /^\+1(\d{3})(\d{3})(\d{4})$/.exec(e || ""); return m ? `(${m[1]}) ${m[2]}-${m[3]}` : (e || ""); }
+function safeUrl(u) { try { const x = new URL(u); return x.protocol === "https:" || x.protocol === "http:" ? x.href : null; } catch { return null; } }
+function host(u) { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return u; } }
+
+let DATA = null, rows = [], shown = 100, selected = null;
+const state = { q: "", cat: "", tier: "", st: "", email: false, opener: false };
+
+function copy(text, btn) {
+  const done = () => { const t = btn.textContent; btn.textContent = "Copied"; setTimeout(() => (btn.textContent = t), 1200); };
+  navigator.clipboard?.writeText(text).then(done, () => { const r = document.createRange(); r.selectNodeContents(btn.previousSibling); getSelection().removeAllRanges(); getSelection().addRange(r); });
+}
+
+function seg(container, key, options) {
+  container.replaceChildren(...options.map(([v, t]) => el("button", { type: "button", "aria-pressed": String(state[key] === v),
+    onclick: () => { state[key] = v; seg(container, key, options); apply(); } }, t)));
+}
+
+function apply() {
+  const q = state.q.trim().toLowerCase();
+  const digits = q.replace(/\D/g, "");
+  rows = DATA.leads.filter((d) =>
+    (!state.cat || d.c === state.cat) && (!state.tier || d.t === state.tier) && (!state.st || d.st === state.st) &&
+    (!state.email || d.em) && (!state.opener || d.o) &&
+    (!q || `${d.n} ${d.ci} ${d.st}`.toLowerCase().includes(q) || (digits.length >= 4 && (d.ph || "").includes(digits))));
+  shown = 100;
+  render();
+}
+
+function render() {
+  const a = rows.filter((d) => d.t === "A").length;
+  $("#summary").replaceChildren(
+    el("span", {}, el("b", {}, fmt.format(rows.length)), " leads shown"),
+    el("span", {}, el("b", {}, fmt.format(a)), " tier A · ", el("b", {}, fmt.format(rows.length - a)), " tier B"),
+    el("span", {}, el("b", {}, fmt.format(rows.filter((d) => d.em).length)), " with email"),
+    el("span", {}, el("b", {}, fmt.format(rows.filter((d) => d.o).length)), " with an opener"));
+  const list = $("#list");
+  const head = el("div", { class: "row head" }, el("span", {}, "Score"), el("span", {}, "Business"), el("span", {}, "Phone"), el("span", {}, "Where"), el("span", {}, "Top reasons"));
+  if (!rows.length) { list.replaceChildren(head, el("div", { class: "empty" }, "No leads match. Clear a filter or the search.")); $("#more").hidden = true; return; }
+  list.replaceChildren(head, ...rows.slice(0, shown).map((d) => el("div", { class: `row${selected === d.id ? " sel" : ""}`, role: "listitem", tabindex: "0",
+      onclick: () => open(d), onkeydown: (e) => { if (e.key === "Enter") open(d); } },
+    el("span", { class: "score" }, el("span", { class: `tier tier-${d.t}` }, d.t), String(Math.round(d.s))),
+    el("div", { class: "c2" }, el("div", { class: "name" }, d.n), el("div", { class: "sub" }, d.c)),
+    el("div", { class: "c3 mono" }, phoneText(d.ph)),
+    el("div", { class: "c4" }, el("div", {}, `${d.ci || ""}${d.ci ? ", " : ""}${d.st || ""}`), el("div", { class: "sub" }, (d.win || "").replace(/\s*\(.*\)$/, ""))),
+    el("div", { class: "c5 pills" }, d.r.slice(0, 2).map((r) => el("span", { class: "pill ac" }, label(r.g))), d.em ? el("span", { class: "pill ok" }, "email") : null))));
+  $("#more").hidden = rows.length <= shown;
+  $("#more").textContent = `Show ${Math.min(100, rows.length - shown)} more of ${fmt.format(rows.length - shown)}`;
+}
+
+function open(d) {
+  selected = d.id;
+  render();
+  const site = d.w && safeUrl(d.w);
+  const phoneVal = el("span", { class: "mono" }, phoneText(d.ph));
+  const sheet = $("#sheet");
+  sheet.replaceChildren(
+    el("button", { class: "btn close", type: "button", "aria-label": "Close", onclick: close }, "✕"),
+    el("h2", {}, d.n),
+    el("div", { class: "sub" }, `${d.c} · ${d.ci || ""}${d.ci ? ", " : ""}${d.st || ""}`),
+    el("div", { class: "sec" }, el("div", { class: "score" }, el("span", { class: `tier tier-${d.t}` }, d.t), el("b", {}, `Score ${Math.round(d.s)}`),
+      el("span", { class: "pill ok" }, "Passed compliance gate"))),
+    el("div", { class: "sec" }, el("h3", {}, "Contact"), el("dl", { class: "kv" },
+      el("dt", {}, "Phone"), el("dd", {}, phoneVal, el("button", { class: "btn sm", type: "button", onclick: (e) => copy(d.ph, e.currentTarget) }, "Copy"), el("span", { class: "pill ok" }, "on their own site")),
+      el("dt", {}, "Email"), el("dd", {}, d.em ? el("span", { class: "mono" }, d.em) : el("span", { class: "note" }, "None published on their site")),
+      el("dt", {}, "Website"), el("dd", {}, site ? el("a", { href: site, target: "_blank", rel: "noopener noreferrer nofollow" }, host(site)) : "—"),
+      el("dt", {}, "Call window"), el("dd", {}, d.win || "—"))),
+    el("div", { class: "sec" }, el("h3", {}, "Opener"), d.o
+      ? el("div", { class: "opener" }, el("q", {}, d.o))
+      : el("p", { class: "note" }, "None: no stored reason is strong enough to open with.")),
+    el("div", { class: "sec" }, el("h3", {}, "Why this lead (quoted from their website)"),
+      d.r.map((r) => { const u = safeUrl(r.u); return el("div", { class: "reason" }, el("b", {}, label(r.g)), el("q", {}, r.e),
+        u ? el("a", { href: u, target: "_blank", rel: "noopener noreferrer nofollow", class: "note" }, `Source: ${host(u)}`) : null); })),
+    el("p", { class: "note" }, "Line type (mobile or landline) is unknown and no Do-Not-Call scrub has been done. Cleared for human-dialled calls only."));
+  sheet.hidden = false;
+  sheet.scrollTop = 0;
+  sheet.querySelector(".close").focus();
+}
+function close() { selected = null; $("#sheet").hidden = true; render(); }
+
+async function init() {
+  let res;
+  try { res = await fetch("leads.json"); if (!res.ok) throw new Error(res.status); DATA = await res.json(); }
+  catch (e) { $("#meta").textContent = "The lead file didn't load. Reload the page to try again."; return; }
+  const n = DATA.leads.length;
+  $("#meta").textContent = `${fmt.format(n)} leads ready to call · export ${DATA.export_id.slice(0, 8)} · ${new Date(DATA.generated).toLocaleDateString()}`;
+  const cats = [...new Set(DATA.leads.map((d) => d.c))].sort();
+  seg($("#cat"), "cat", [["", "All"], ...cats.map((c) => [c, c[0].toUpperCase() + c.slice(1)])]);
+  seg($("#tier"), "tier", [["", "A + B"], ["A", "A"], ["B", "B"]]);
+  const states = [...new Set(DATA.leads.map((d) => d.st).filter(Boolean))].sort();
+  $("#state").append(...states.map((s) => el("option", { value: s }, s)));
+  $("#q").addEventListener("input", (e) => { state.q = e.target.value; apply(); });
+  $("#state").addEventListener("change", (e) => { state.st = e.target.value; apply(); });
+  $("#hasEmail").addEventListener("change", (e) => { state.email = e.target.checked; apply(); });
+  $("#hasOpener").addEventListener("change", (e) => { state.opener = e.target.checked; apply(); });
+  $("#more").addEventListener("click", () => { shown += 100; render(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#sheet").hidden) close(); });
+  $("#foot").replaceChildren(
+    el("div", {}, "Every lead passed the compliance gate: tier A or B, phone confirmed on the business's own website, not shared, not suppressed, at least one reason quoted from their site."),
+    el("div", {}, DATA.attribution));
+  apply();
+}
+init();
+</script>

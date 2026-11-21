@@ -22,8 +22,9 @@ Read first: `docs/MASTER-SPEC.md` (the spec), `docs/ICP.md` (who we target), `do
 One stage at a time (spec §9): explore -> plan -> **wait for approval** -> implement with tests -> verify -> report
 (done / tested / untested / gaps / open questions) -> **wait for "verified"**. Commit after each green stage. Ask before adding scope.
 
-Current status: **Stage 6 verified (set-up); waiting for pilot1 call outcomes.** Stage 7 (scale-out) is decided
-by the pilot1 readout. Stages 0, 1, 1b, 2, 4, 5 verified; Stage 3 redirected (no paid phone lookups).
+Current status: **Stage 7 database build running** (user: "keep going until done"): all 7 US categories loaded
+(726k), best-first crawl in rounds via `scripts/scale_loop.sh`. Calling at scale still waits for the pilot1 readout.
+Stages 0-6 verified (Stage 3 redirected: no paid phone lookups).
 Reports: `docs/reports/stage1-pilot-*.md`, `explorer-benchmark.md`, `stage2-crawl-pilot.md`, `stage2-precision.md`,
 `stage4-scoring-pilot.md`, `stage5-export.md`, `stage6-pilot-setup.md`, `stage6-readout-pilot1.md`.
 
@@ -72,8 +73,13 @@ uv run leads crawl enqueue       # one queue row per website (sites shared by lo
 uv run leads crawl run --dry-run
 uv run leads crawl run --max-sites 1000 --minutes 60   # resumable; safe to run 2 workers in parallel
 uv run leads crawl status
-uv run leads crawl extract       # no network: re-run after changing extract.py rules
+uv run leads crawl extract       # no network, incremental (new/changed sites); --full after changing rules
 uv run leads crawl report        # docs/reports/stage2-crawl-pilot.md (incl. 100-hit review sample)
+
+# Stage 7: scale-out loop (best-first crawl rounds -> extract -> score -> gate -> export; resumable)
+uv run leads universe load --all --categories plumbing,hvac,electrical,roofing_restoration,dental,law_small,auto_repair
+uv run leads crawl enqueue --all # every loaded website, prioritised
+scripts/scale_loop.sh 100 20 6   # rounds, minutes per round, stop below N GB free disk
 
 # Stage 4: rule-based score (Pain x Value x Reachability x Fit) from stored signals ($0, idempotent)
 uv run leads score run           # writes scores (+ itemised components) and businesses.score/tier
