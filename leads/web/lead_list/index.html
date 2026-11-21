@@ -96,11 +96,12 @@ footer { color: var(--muted); font-size: 12px; padding-block: 0 30px; display: g
     </div>
     <div class="controls">
       <input type="search" id="q" placeholder="Search name, city, state or phone" aria-label="Search leads" autocomplete="off">
-      <div class="seg" role="group" aria-label="Category" id="cat"></div>
+      <select id="cat" aria-label="Category"><option value="">All categories</option></select>
       <div class="seg" role="group" aria-label="Tier" id="tier"></div>
       <select id="state" aria-label="State"><option value="">All states</option></select>
       <label class="chk"><input type="checkbox" id="hasEmail"> Has email</label>
       <label class="chk"><input type="checkbox" id="hasOpener"> Has opener</label>
+      <label class="chk" title="Voicemail on their own site, hiring someone for the phones, or booking by phone only"><input type="checkbox" id="strong"> Strong evidence only</label>
     </div>
   </div>
 </header>
@@ -134,12 +135,17 @@ const SIGNAL = {
   multiple_locations: "More than one location", owner_operated: "Owner / family operated", review_hard_to_reach: "Review says hard to reach",
 };
 const label = (g) => SIGNAL[g] || g.replaceAll("_", " ");
+const STRONG = new Set(["leave_message_text", "hiring_receptionist", "phone_only_booking"]);
+const isStrong = (d) => d.r.some((r) => STRONG.has(r.g));
+const CATEGORY = { plumbing: "Plumbing", hvac: "HVAC", dental: "Dental", law_small: "Law firm", roofing_restoration: "Roofing",
+  electrical: "Electrical", auto_repair: "Auto repair" };
+const catLabel = (c) => CATEGORY[c] || c;
 function phoneText(e) { const m = /^\+1(\d{3})(\d{3})(\d{4})$/.exec(e || ""); return m ? `(${m[1]}) ${m[2]}-${m[3]}` : (e || ""); }
 function safeUrl(u) { try { const x = new URL(u); return x.protocol === "https:" || x.protocol === "http:" ? x.href : null; } catch { return null; } }
 function host(u) { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return u; } }
 
 let DATA = null, rows = [], shown = 100, selected = null;
-const state = { q: "", cat: "", tier: "", st: "", email: false, opener: false };
+const state = { q: "", cat: "", tier: "", st: "", email: false, opener: false, strong: false };
 
 function copy(text, btn) {
   const done = () => { const t = btn.textContent; btn.textContent = "Copied"; setTimeout(() => (btn.textContent = t), 1200); };
@@ -156,7 +162,7 @@ function apply() {
   const digits = q.replace(/\D/g, "");
   rows = DATA.leads.filter((d) =>
     (!state.cat || d.c === state.cat) && (!state.tier || d.t === state.tier) && (!state.st || d.st === state.st) &&
-    (!state.email || d.em) && (!state.opener || d.o) &&
+    (!state.email || d.em) && (!state.opener || d.o) && (!state.strong || isStrong(d)) &&
     (!q || `${d.n} ${d.ci} ${d.st}`.toLowerCase().includes(q) || (digits.length >= 4 && (d.ph || "").includes(digits))));
   shown = 100;
   render();
@@ -168,14 +174,15 @@ function render() {
     el("span", {}, el("b", {}, fmt.format(rows.length)), " leads shown"),
     el("span", {}, el("b", {}, fmt.format(a)), " tier A · ", el("b", {}, fmt.format(rows.length - a)), " tier B"),
     el("span", {}, el("b", {}, fmt.format(rows.filter((d) => d.em).length)), " with email"),
-    el("span", {}, el("b", {}, fmt.format(rows.filter((d) => d.o).length)), " with an opener"));
+    el("span", {}, el("b", {}, fmt.format(rows.filter((d) => d.o).length)), " with an opener"),
+    el("span", {}, el("b", {}, fmt.format(rows.filter(isStrong).length)), " with strong evidence"));
   const list = $("#list");
   const head = el("div", { class: "row head" }, el("span", {}, "Score"), el("span", {}, "Business"), el("span", {}, "Phone"), el("span", {}, "Where"), el("span", {}, "Top reasons"));
   if (!rows.length) { list.replaceChildren(head, el("div", { class: "empty" }, "No leads match. Clear a filter or the search.")); $("#more").hidden = true; return; }
   list.replaceChildren(head, ...rows.slice(0, shown).map((d) => el("div", { class: `row${selected === d.id ? " sel" : ""}`, role: "listitem", tabindex: "0",
       onclick: () => open(d), onkeydown: (e) => { if (e.key === "Enter") open(d); } },
     el("span", { class: "score" }, el("span", { class: `tier tier-${d.t}` }, d.t), String(Math.round(d.s))),
-    el("div", { class: "c2" }, el("div", { class: "name" }, d.n), el("div", { class: "sub" }, d.c)),
+    el("div", { class: "c2" }, el("div", { class: "name" }, d.n), el("div", { class: "sub" }, catLabel(d.c))),
     el("div", { class: "c3 mono" }, phoneText(d.ph)),
     el("div", { class: "c4" }, el("div", {}, `${d.ci || ""}${d.ci ? ", " : ""}${d.st || ""}`), el("div", { class: "sub" }, (d.win || "").replace(/\s*\(.*\)$/, ""))),
     el("div", { class: "c5 pills" }, d.r.slice(0, 2).map((r) => el("span", { class: "pill ac" }, label(r.g))), d.em ? el("span", { class: "pill ok" }, "email") : null))));
@@ -192,7 +199,7 @@ function open(d) {
   sheet.replaceChildren(
     el("button", { class: "btn close", type: "button", "aria-label": "Close", onclick: close }, "✕"),
     el("h2", {}, d.n),
-    el("div", { class: "sub" }, `${d.c} · ${d.ci || ""}${d.ci ? ", " : ""}${d.st || ""}`),
+    el("div", { class: "sub" }, `${catLabel(d.c)} · ${d.ci || ""}${d.ci ? ", " : ""}${d.st || ""}`),
     el("div", { class: "sec" }, el("div", { class: "score" }, el("span", { class: `tier tier-${d.t}` }, d.t), el("b", {}, `Score ${Math.round(d.s)}`),
       el("span", { class: "pill ok" }, "Passed compliance gate"))),
     el("div", { class: "sec" }, el("h3", {}, "Contact"), el("dl", { class: "kv" },
@@ -219,13 +226,17 @@ async function init() {
   catch (e) { $("#meta").textContent = "The lead file didn't load. Reload the page to try again."; return; }
   const n = DATA.leads.length;
   $("#meta").textContent = `${fmt.format(n)} leads ready to call · export ${DATA.export_id.slice(0, 8)} · ${new Date(DATA.generated).toLocaleDateString()}`;
-  const cats = [...new Set(DATA.leads.map((d) => d.c))].sort();
-  seg($("#cat"), "cat", [["", "All"], ...cats.map((c) => [c, c[0].toUpperCase() + c.slice(1)])]);
+  const catCount = {};
+  for (const d of DATA.leads) catCount[d.c] = (catCount[d.c] || 0) + 1;
+  $("#cat").append(...Object.keys(catCount).sort((a, b) => catCount[b] - catCount[a])
+    .map((c) => el("option", { value: c }, `${catLabel(c)} (${fmt.format(catCount[c])})`)));
   seg($("#tier"), "tier", [["", "A + B"], ["A", "A"], ["B", "B"]]);
   const states = [...new Set(DATA.leads.map((d) => d.st).filter(Boolean))].sort();
   $("#state").append(...states.map((s) => el("option", { value: s }, s)));
   $("#q").addEventListener("input", (e) => { state.q = e.target.value; apply(); });
   $("#state").addEventListener("change", (e) => { state.st = e.target.value; apply(); });
+  $("#cat").addEventListener("change", (e) => { state.cat = e.target.value; apply(); });
+  $("#strong").addEventListener("change", (e) => { state.strong = e.target.checked; apply(); });
   $("#hasEmail").addEventListener("change", (e) => { state.email = e.target.checked; apply(); });
   $("#hasOpener").addEventListener("change", (e) => { state.opener = e.target.checked; apply(); });
   $("#more").addEventListener("click", () => { shown += 100; render(); });
