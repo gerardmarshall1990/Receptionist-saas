@@ -176,11 +176,12 @@ def run_extract(
         for i in range(0, len(sites), batch):
             chunk = sites[i : i + batch]
             pages = _pages_by_domain(data_dir / "crawl" / "pages", [s["domain"] for s in chunk])
-            _extract_chunk(conn, chunk, pages, cfg, counts)
+            failed = _extract_chunk(conn, chunk, pages, cfg, counts)
+            # A site that failed stays unmarked, so the next incremental pass retries it.
             conn.execute(
                 "update crawl_sites set extracted_version = %s, extracted_at = now()"
                 " where domain = any(%s)",
-                (EXTRACTOR_VERSION, [s["domain"] for s in chunk]),
+                (EXTRACTOR_VERSION, [s["domain"] for s in chunk if s["domain"] not in failed]),
             )
             conn.commit()
             log.info("extract_progress", done=min(i + batch, len(sites)), total=len(sites))
@@ -194,7 +195,8 @@ def _extract_chunk(
     pages: dict[str, list[dict[str, Any]]],
     cfg: AppConfig,
     counts: dict[str, int],
-) -> None:
+) -> set[str]:
+    failed: set[str] = set()
     for site in sites:
         domain, status = site["domain"], site["status"]
         businesses = conn.execute(
@@ -214,6 +216,7 @@ def _extract_chunk(
         except Exception as exc:  # one odd page must not stop the pass; it is counted
             log.error("extract_failed", domain=domain, error=f"{type(exc).__name__}: {exc}")
             counts["extract_errors"] += 1
+            failed.add(domain)
             continue
         with conn.transaction(), conn.cursor() as cur:
             for b, ex in zip(businesses, exs, strict=True):
@@ -224,3 +227,4 @@ def _extract_chunk(
                     if hit.value:
                         counts[f"signal:{name}"] += 1
                 counts["with_site_email"] += bool(ex.emails)
+    return failed

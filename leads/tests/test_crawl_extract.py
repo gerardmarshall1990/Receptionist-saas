@@ -533,3 +533,13 @@ def test_v9_law_sample_false_positives(text: str, signal: str, expected: bool) -
     assert (
         signal in extract(_p(text), {"name_key": "x", "category": "law_small"}, CFG).signals
     ) is expected
+
+
+def test_control_characters_inside_dropped_tags_do_not_break_parsing() -> None:
+    # 0x03 in text that drop_tree() moves into the parent once <script> is removed.
+    p = parse(
+        "<html><body><div>Call us<script>x()</script>\x03 today</div></body></html>",
+        "https://x.com/",
+    )
+    assert "Call us" in p.text
+    assert "today" in p.text

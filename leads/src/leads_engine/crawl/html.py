@@ -66,7 +66,13 @@ def _visible_text(doc: lxml.html.HtmlElement) -> str:
     return "".join(out)
 
 
+# Control characters (other than tab/newline/CR) make lxml refuse text it moves around
+# when dropping <script>/<style> ("All strings must be XML compatible").
+_CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+
+
 def parse(html: str, url: str) -> Page:
+    html = _CONTROL.sub(" ", html)
     page = Page(url=url, raw_lower=html.lower())
     try:
         doc = lxml.html.document_fromstring(html)
