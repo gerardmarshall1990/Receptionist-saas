@@ -578,3 +578,36 @@ def test_v11_roofing_sample(text: str, signal: str, expected: bool) -> None:
         signal
         in extract(_p(text), {"name_key": "x", "category": "roofing_restoration"}, CFG).signals
     ) is expected
+
+
+# v12: second roofing sample (passing leads).
+@pytest.mark.parametrize(
+    ("text", "signal", "expected"),
+    [
+        ("Online and Available Anytime. Start from your phone or computer, day or night. Get Cost Estimate.",
+         "emergency_247_claim", False),
+        ("We identify your roof type, estimate its age, determine if emergency repairs are needed.",
+         "emergency_247_claim", False),
+        ("Office Hours: Mon-Fri 9-5 | 24/7 Emergency Service", "emergency_247_claim", True),
+        ("OTHER SUPPLIERS: Estimates May Cost Up to $200. Answering Machine. Up to $500 Minimum Charge.",
+         "leave_message_text", False),
+        ("Book a free roof inspection. Leave your name and number. Here is what happens next. We call you.",
+         "leave_message_text", False),
+        ("To Contact Us, Call (706) 373-1694. Leave your name and Phone number on voice mail or text.",
+         "leave_message_text", True),
+        ("If we miss your call, leave a message and we will get back to you.", "leave_message_text", True),
+        ("Our Locations. We proudly serve homeowners across the region.", "multiple_locations", False),
+        ("Our Locations. Northeast Ohio. Areas We Serve: Counties...", "multiple_locations", False),
+        ("Roof 360 Locations: 1275 Glenlivet Drive, Allentown, PA and 1023 Mill Road, Pen Argyl, PA", "multiple_locations", True),
+        ("With Two Locations To Better Serve Southern Idaho", "multiple_locations", True),
+        ("Project sizes range from $500.00 to $3,300,000.00.", "pricing_hints", False),
+        ("Financing: Loans are available from $500 to $25,000.", "pricing_hints", False),
+        ("Exclusive Offer: $500 Off Platinum Roof Installations", "pricing_hints", True),
+        ("Minor repairs typically range from $300 to $1,000.", "pricing_hints", True),
+    ],
+)  # fmt: skip
+def test_v12_roofing_sample(text: str, signal: str, expected: bool) -> None:
+    assert (
+        signal
+        in extract(_p(text), {"name_key": "x", "category": "roofing_restoration"}, CFG).signals
+    ) is expected

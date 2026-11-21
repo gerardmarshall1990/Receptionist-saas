@@ -31,7 +31,10 @@ from leads_engine.universe import normalize as nz
 #      another firm's site); "say if it is safe to leave a voicemail" is a form field.
 # v11: roofing sample: "$75K losses" is not a price (no K/M amounts); "500+ service trucks" / "250 technicians"
 #      is a large company (chain signal), like "N locations nationwide".
-EXTRACTOR_VERSION = "stage2-v11"
+# v12: second roofing sample: "our locations" alone is usually a service-area heading; online tools "day or night";
+#      "if emergency repairs are needed"; supplier comparison tables; "leave your name and number" must be
+#      about a voicemail/tone; loans / project sizes are not prices.
+EXTRACTOR_VERSION = "stage2-v12"
 SNIPPET = 300
 
 
@@ -62,7 +65,8 @@ LEAVE_MESSAGE = _rx(
     r"listen to (?:the|our) voice ?mail", r"left (?:an? )?(?:after[- ]hours? )?voice ?mail",
     r"voice ?mail (?:after hours|for after[- ]hours)", r"after[- ]hours voice ?mail", r"answering machine",
     r"leave (?:us )?a message (?:after the (?:tone|beep)|on (?:our|the) (?:voice ?mail|machine))",
-    r"leave your name and (?:phone )?number",
+    # Only when it's about the phone ("...on voice mail", "...after the tone"); alone it's usually a web form.
+    r"leave your name and (?:phone )?number (?:on|at|after) (?:the |our )?(?:voice ?mail|tone|beep|machine)",
     r"(?:all|our|the) (?:phone )?lines are (?:busy|tied up)",
     r"if (?:we(?:'|\u2019)?re|we are|no one is) (?:unable to answer|out on (?:a )?(?:job|call)|on another call|"
     r"busy with (?:a )?customers?|not available)",
@@ -70,7 +74,7 @@ LEAVE_MESSAGE = _rx(
 )  # fmt: skip
 # Reviews that talk about OTHER businesses ("unlike 2 other plumbers I called ...").
 COMPETITOR = _rx(
-    r"\b(?:last|other|another|previous|prior|many|several|multiple)\s+(?:company|companies|plumbers?|dentists?|"
+    r"\b(?:last|other|another|previous|prior|many|several|multiple)\s+(?:company|companies|plumbers?|dentists?|suppliers?|"
     r"contractors?|hvac (?:company|companies)|providers?|offices?|businesses|attorneys?|lawyers?|law firms?|"
     r"firms?|electricians?|roofers?|roofing companies|mechanics?|shops?|garages?)",
     r"\bunlike\b",
@@ -126,6 +130,8 @@ EMERGENCY_NOT = _rx(
     r"(?:running|working|runs|works)\W+$",
     r"(?:fire|police|medical|county|city)\W+(?:and|&)?\W*$",  # "Fire and Emergency Services"
     r"\b(?:911|caseworkers?|hotlines?|crisis line)\b\W+(?:\w+\W+){0,12}$",
+    r"\b(?:online|computer|website|app)\b\W+(?:\w+\W+){0,3}$",  # "start from your phone or computer, day or night"
+    r"\b(?:if|whether)\W+$",  # "determine if emergency repairs are needed"
 )
 # The business already has someone (or something) answering: no 24/7 pain claim then.
 COVERAGE = _rx(
@@ -194,8 +200,14 @@ PRICING = _rx(
     r"(?:starting at|starts at|from|only|just|flat[- ]rate|special|coupon|price)[\s:]{0,3}(?:just |only )?\$\s?\d{2,5}(?![\d,]|\s?[kKmM]\b)",
     r"\$\s?\d{2,5}(?:\.\d\d)?\s*(?:off|special|flat rate|service call|diagnostic|exam|cleaning)",
 )  # fmt: skip
+# Money that isn't a price for their service: "loans available from $500", "project sizes range from $500".
+PRICING_NOT = _rx(
+    r"\b(?:loans?|financing|project sizes?|claims?|losses|budgets?)\b\W+(?:\w+\W+){0,4}$"
+)
 MULTI_LOCATION = _rx(
-    r"our locations",
+    # "Our Locations" alone is mostly a service-area heading: require a count or addresses after it.
+    r"our (?:two|three|four|five|\d+) (?:convenient )?locations",
+    r"\blocations:\s*\d+ ",
     r"(?:two|three|four|five|\d+) (?:convenient )?locations",
     r"multiple locations",
 )
@@ -380,7 +392,7 @@ def extract(pages: list[Page], business: dict[str, Any], cfg: AppConfig) -> Extr
             break
 
     # --- value / fit -------------------------------------------------------
-    if h := _first(PRICING, pages):
+    if h := _first(PRICING, pages, not_before=PRICING_NOT):
         sig["pricing_hints"] = h
     if h := _first(MULTI_LOCATION, pages):
         sig["multiple_locations"] = h

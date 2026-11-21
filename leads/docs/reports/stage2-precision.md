@@ -80,4 +80,12 @@ isn't on the site (an attorney's listing on another firm's site). Those leads ge
 0/1 ("From $75K losses"). **v11 fixes:** no K/M amounts as prices; "500+ service trucks", "250 employees" mark a
 large company (chain signal), like "N locations nationwide".
 
+**Roofing, second sample (passing leads, v11, ~50 hits):** limited hours 7/7, phone-only 7/7, hiring 6/7,
+emergency 5/7, voicemail 5/7, pricing 5/7, multiple locations 4/7. **v12 fixes:**
+- "Our Locations" alone is usually a service-area heading; it now needs a count or addresses after it.
+- Online tools available "day or night" and "determine if emergency repairs are needed" are not claims.
+- Supplier comparison tables are excluded.
+- "Leave your name and number" counts only when it refers to voicemail or a tone.
+- Loans and project sizes are not prices.
+
 Open: electrical and auto still need their own sample (under 100 crawled sites each).
