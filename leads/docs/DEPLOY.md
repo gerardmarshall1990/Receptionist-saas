@@ -43,8 +43,9 @@ docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d explore
 docker compose -f deploy/docker-compose.yml logs -f crawler     # rounds, sites left, free disk, export counts
 ```
 
-The crawler service runs `scripts/scale_loop.sh`, in 20-minute crawl rounds, each followed by:
-1. incremental extraction
+The crawler service runs `scripts/pipeline.sh`. Two crawl workers run continuously, and every 20 minutes
+it runs, in order:
+1. incremental extraction (in parallel across CPUs)
 2. scoring
 3. the compliance gate
 4. a fresh export under the `lead-data` volume

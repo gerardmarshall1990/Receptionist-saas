@@ -7,7 +7,11 @@ so re-running with a better extractor converges (EXTRACTOR_VERSION is stored).
 from __future__ import annotations
 
 import gzip
+import multiprocessing
+import os
 from collections import defaultdict
+from collections.abc import Iterator
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 from typing import Any
 
@@ -34,6 +38,7 @@ STATUS_FLAG = {
     "offsite": "website_offsite", "error": "crawl_failed",
 }  # fmt: skip
 log = get_logger("extract")
+PARALLEL_MIN = 50  # below this many sites a chunk is extracted in-process
 TERMINAL = ("done", "blocked", "robots_disallowed", "parked", "offsite", "error")
 
 
@@ -157,7 +162,12 @@ def _write(
 
 
 def run_extract(
-    url: str, cfg: AppConfig, data_dir: Path, full: bool = False, batch: int = 8_000
+    url: str,
+    cfg: AppConfig,
+    data_dir: Path,
+    full: bool = False,
+    batch: int = 8_000,
+    workers: int | None = None,
 ) -> dict[str, int]:
     """Extract signals for finished sites. Incremental by default: only sites crawled since
     their last extraction, or extracted by an older EXTRACTOR_VERSION. Batches of `batch`
@@ -176,7 +186,7 @@ def run_extract(
         for i in range(0, len(sites), batch):
             chunk = sites[i : i + batch]
             pages = _pages_by_domain(data_dir / "crawl" / "pages", [s["domain"] for s in chunk])
-            failed = _extract_chunk(conn, chunk, pages, cfg, counts)
+            failed = _extract_chunk(conn, chunk, pages, cfg, counts, workers)
             # A site that failed stays unmarked, so the next incremental pass retries it.
             conn.execute(
                 "update crawl_sites set extracted_version = %s, extracted_at = now()"
@@ -189,37 +199,63 @@ def run_extract(
     return dict(counts)
 
 
+def _work(
+    task: tuple[str, str, list[dict[str, Any]], list[dict[str, Any]], AppConfig],
+) -> tuple[str, Any]:
+    """Parse + extract one site (runs in a worker process). Returns extractions or an error."""
+    domain, status, pages, businesses, cfg = task
+    try:
+        parsed = [
+            parse(decode(gzip.decompress(p["html_gz"]), p["content_type"]), p["final_url"])
+            for p in pages
+        ]
+        return domain, [
+            extract(parsed, b, cfg) if status in {"done", "offsite"} else Extraction()
+            for b in businesses
+        ]
+    except Exception as exc:  # one odd page must not stop the pass; it is counted
+        return domain, f"{type(exc).__name__}: {exc}"
+
+
 def _extract_chunk(
     conn: psycopg.Connection[dict[str, Any]],
     sites: list[dict[str, Any]],
     pages: dict[str, list[dict[str, Any]]],
     cfg: AppConfig,
     counts: dict[str, int],
+    workers: int | None = None,
 ) -> set[str]:
+    """Parsing is CPU-bound: worker processes parse and extract, this process writes to Postgres."""
+    by_domain: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for b in conn.execute(
+        "select id, name, name_key, category, phone, domain, flags, is_chain from businesses"
+        " where domain = any(%s)",
+        ([s["domain"] for s in sites],),
+    ):
+        by_domain[b["domain"]].append(b)
+    status_of = {s["domain"]: s["status"] for s in sites}
+    tasks = [(d, status_of[d], pages.get(d, []), by_domain.get(d, []), cfg) for d in status_of]
+    n = workers if workers is not None else max(1, (os.cpu_count() or 2))
     failed: set[str] = set()
-    for site in sites:
-        domain, status = site["domain"], site["status"]
-        businesses = conn.execute(
-            "select id, name, name_key, category, phone, domain, flags, is_chain from businesses"
-            " where domain = %s",
-            (domain,),
-        ).fetchall()
-        try:
-            parsed = [
-                parse(decode(gzip.decompress(p["html_gz"]), p["content_type"]), p["final_url"])
-                for p in pages.get(domain, [])
-            ]
-            exs = [
-                extract(parsed, b, cfg) if status in {"done", "offsite"} else Extraction()
-                for b in businesses
-            ]
-        except Exception as exc:  # one odd page must not stop the pass; it is counted
-            log.error("extract_failed", domain=domain, error=f"{type(exc).__name__}: {exc}")
+
+    def results() -> Iterator[tuple[str, Any]]:
+        if n <= 1 or len(tasks) < PARALLEL_MIN:
+            yield from map(_work, tasks)
+            return
+        with ProcessPoolExecutor(
+            max_workers=n, mp_context=multiprocessing.get_context("spawn")
+        ) as pool:
+            yield from pool.map(_work, tasks, chunksize=25)
+
+    for domain, out in results():
+        if isinstance(out, str):
+            log.error("extract_failed", domain=domain, error=out)
             counts["extract_errors"] += 1
             failed.add(domain)
             continue
+        status = status_of[domain]
         with conn.transaction(), conn.cursor() as cur:
-            for b, ex in zip(businesses, exs, strict=True):
+            for b, ex in zip(by_domain.get(domain, []), out, strict=True):
                 _write(cur, b, ex, cfg, status)
                 counts["businesses"] += 1
                 counts[f"site_{status}"] += 1

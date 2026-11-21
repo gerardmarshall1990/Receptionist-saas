@@ -44,8 +44,8 @@ services:
   crawler:
     build: ..
     restart: unless-stopped
-    entrypoint: ["bash", "scripts/scale_loop.sh"]
-    command: ["100000", "20", "20"]   # rounds, minutes per round, stop below 20 GB free
+    entrypoint: ["bash", "scripts/pipeline.sh"]
+    command: ["20", "20"]   # refresh every 20 min, stop crawling below 20 GB free
     environment:
       <<: *env
       PGHOST: db

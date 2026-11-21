@@ -11,7 +11,7 @@ import pytest
 
 from leads_engine import db
 from leads_engine.config_loader import load_config
-from leads_engine.crawl import runner
+from leads_engine.crawl import runner, store
 from leads_engine.crawl.store import run_extract
 from tests.conftest import REAL_CONFIG, needs_db
 from tests.test_crawl_fetcher import Site, html, plumber_site, site  # noqa: F401 (fixture)
@@ -46,7 +46,12 @@ def _business(
     return str(row[0])
 
 
-def test_crawl_and_extract_end_to_end(fresh_db: str, site: Site, tmp_path: Path) -> None:  # noqa: F811
+def test_crawl_and_extract_end_to_end(
+    fresh_db: str,
+    site: Site,  # noqa: F811 (pytest fixture)
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     db.migrate(fresh_db)
     plumber_site(site)
     with psycopg.connect(fresh_db, autocommit=True) as conn:
@@ -142,6 +147,19 @@ def test_crawl_and_extract_end_to_end(fresh_db: str, site: Site, tmp_path: Path)
     assert run_extract(fresh_db, CFG, tmp_path)["sites_to_extract"] == 1
     # A full pass converges: same row counts, nothing duplicated.
     run_extract(fresh_db, CFG, tmp_path, full=True)
+    assert snapshot() == before
+
+    # The worker-process path gives exactly the same rows as the in-process one.
+    def signal_rows() -> list[tuple[object, ...]]:
+        with psycopg.connect(fresh_db) as conn:
+            return conn.execute(
+                "select business_id, signal, value, evidence from signals order by 1, 2"
+            ).fetchall()
+
+    serial = signal_rows()
+    monkeypatch.setattr(store, "PARALLEL_MIN", 0)
+    run_extract(fresh_db, CFG, tmp_path, full=True, workers=2)
+    assert signal_rows() == serial
     assert snapshot() == before
 
 
