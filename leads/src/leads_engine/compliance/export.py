@@ -148,12 +148,18 @@ def contract_record(row: dict[str, Any], cfg: AppConfig) -> dict[str, Any]:
     """The exported record. Only called for rows that passed the gate."""
     cat = cfg.categories.get(row["category"])
     reasons = [dict(r) for r in row["reasons"][: cfg.compliance.export.max_reasons]]
-    opener = pick_opener(
-        cat,
-        (r["signal"] for r in row["reasons"]),
-        cfg.scoring.signal_weights,
-        row["name"],
-        row["city"],
+    # No opener when the listing's name isn't on the website: the caller may reach a firm with
+    # another name, and an opener that names the wrong business is worse than none.
+    opener = (
+        None
+        if "name_not_on_site" in (row["flags"] or ())
+        else pick_opener(
+            cat,
+            (r["signal"] for r in row["reasons"]),
+            cfg.scoring.signal_weights,
+            row["name"],
+            row["city"],
+        )
     )
     return {
         "business_id": str(row["id"]),

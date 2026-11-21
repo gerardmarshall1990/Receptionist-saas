@@ -543,3 +543,20 @@ def test_control_characters_inside_dropped_tags_do_not_break_parsing() -> None:
     )
     assert "Call us" in p.text
     assert "today" in p.text
+
+
+def test_v10_name_not_on_site_and_form_voicemail_field() -> None:
+    # Listing "Dennis D. Camp P.A." whose number is on another firm's site.
+    page = _p(
+        "The Law Office of Stanley Plappert. Estate planning. Call For A Consultation (352) 351-1234"
+    )
+    biz = {"name_key": "dennis camp", "category": "law_small", "phone": "+13523511234"}
+    flags = extract(page, biz, CFG).flags
+    assert "name_not_on_site" in flags
+    assert "website_mismatch" not in flags  # the number does reach this site
+    same = {"name_key": "stanley plappert", "category": "law_small", "phone": "+13523511234"}
+    assert "name_not_on_site" not in extract(page, same, CFG).flags
+    form = _p(
+        "Full name * Phone * The fastest way to reach you. Say if it is safe to leave a voicemail. Email *"
+    )
+    assert "leave_message_text" not in extract(form, BIZ, CFG).signals

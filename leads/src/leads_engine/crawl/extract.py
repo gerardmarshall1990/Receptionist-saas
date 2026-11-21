@@ -27,7 +27,9 @@ from leads_engine.universe import normalize as nz
 #     attorneys/firms; "email or call" and "submit your inquiry" are other channels; clients' "family-owned".
 # v9: second law sample: "call answering 24/7" = coverage; 911 / public emergency services / hotlines;
 #     intake-form voicemail questions; "you can also fill out"; owner wording about clients or practice areas.
-EXTRACTOR_VERSION = "stage2-v9"
+# v10: name_not_on_site flag (listing name absent although the phone matches: e.g. an attorney's listing on
+#      another firm's site); "say if it is safe to leave a voicemail" is a form field.
+EXTRACTOR_VERSION = "stage2-v10"
 SNIPPET = 300
 
 
@@ -100,6 +102,8 @@ LEAVE_MESSAGE_NOT = _rx(
     r"your regular dentist",
     # Intake-form questions: "May we leave a voicemail? Yes / No".
     r"may we leave",
+    r"safe to leave",
+    r"\bsay if\b",
     r"\bok(?:ay)?\b[^.?]{0,40}\bto leave",
     r"choose an option",
     r"\byes\W+no\b",
@@ -398,13 +402,17 @@ def extract(pages: list[Page], business: dict[str, Any], cfg: AppConfig) -> Extr
         for w in (business.get("name_key") or "").split()
         if len(w) >= 3 and w not in nz._GENERIC_WORDS
     ]
-    site_text = " ".join((p.title + " " + p.text).lower() for p in pages)
+    # Same normalisation as name_key: "Joe's" on the site matches the listing key "joes".
+    site_text = re.sub(r"['\u2019`]", "", " ".join((p.title + " " + p.text).lower() for p in pages))
     name_match = any(re.search(rf"\b{re.escape(w)}\b", site_text) for w in words) if words else None
     phone_match = bool(listed and listed in ex.phones)
     if listed and ex.phones and not phone_match:
         ex.flags.append("phone_not_on_site")
     if name_match is False and not phone_match:
         ex.flags.append("website_mismatch")
+    elif name_match is False:
+        # The number is on the site, but the name isn't: the caller would reach a firm with another name.
+        ex.flags.append("name_not_on_site")
     if len(home.text) < 300:
         ex.flags.append("thin_homepage")  # likely JS-rendered: signals may be missing
     return ex

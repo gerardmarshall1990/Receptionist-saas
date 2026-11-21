@@ -331,3 +331,19 @@ def test_export_is_repeatable_and_dry_run_writes_nothing(fresh_db: str, tmp_path
     assert a.export_id != b.export_id
     strip = [{k: v for k, v in r.items()} for r in a.records]
     assert strip == b.records == dry.records
+
+
+def test_no_opener_when_listing_name_is_not_on_the_site() -> None:
+    from leads_engine.compliance.export import contract_record
+
+    row: dict[str, Any] = {
+        "id": "b1", "name": "Dennis D. Camp P.A.", "category": "law_small", "country": "US", "state": "FL",
+        "city": "Ocala", "tz": "America/New_York", "e164": "+13523511234", "phone_status": "likely",
+        "line_type": None, "email": None, "email_status": "none", "website": "https://x.test",
+        "total": 72, "tier": "A", "licenses": ["CDLA-Permissive-2.0"], "source": "overture",
+        "crawled_at": None, "verified_at": None, "flags": [],
+        "reasons": [{"signal": "leave_message_text", "evidence": "after hours voicemail", "source_url": "https://x.test"}],
+    }  # fmt: skip
+    assert contract_record(row, CFG)["opener"]
+    row["flags"] = ["name_not_on_site"]
+    assert contract_record(row, CFG)["opener"] is None

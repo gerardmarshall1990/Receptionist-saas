@@ -54,6 +54,7 @@ FLAG_LABELS: dict[str, str] = {
     "uses_answering_service": "Already has answering service / AI (disqualified)",
     "franchise_disclaimer": "Franchise disclaimer on site (disqualified)",
     "website_mismatch": "Website doesn't match the business",
+    "name_not_on_site": "Listing name not on its website",
     "phone_not_on_site": "Listed phone not on their website",
     "crawl_blocked": "Website blocked our crawler",
     "robots_disallowed": "robots.txt disallows crawling",
