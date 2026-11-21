@@ -39,7 +39,8 @@ first, then roofing (0.90), then HVAC and dental (0.85).
 3. **Reload protection:** the 7-category reload would have deleted rows that pilot1 references. They're kept and
    flagged `not_in_latest_build`, which the gate blocks.
 4. **Accuracy on law sites:** two hand-graded samples (extractor v8, v9); see `stage2-precision.md`.
-5. **Openers:** the law template no longer assumes criminal defence.
+5. **Openers:** the law template no longer assumes criminal defence. Since v10 there's no opener when the listing's
+   name isn't on its website (0.6% of passing leads), so a caller never greets a firm by the wrong name.
 
 ## Lead list
 
@@ -55,6 +56,7 @@ https://claude.ai/artifact/JvbTF3fXVsjukmnZmMDYZG
 | 15:15 UTC | 12,629 | 1,798 | 1,448 |
 | 15:42 UTC | 15,323 | 2,128 | 1,784 |
 | 16:11 UTC | 17,887 | 2,445 | 2,086 |
+| 17:03 UTC (v10) | 20,664 | 2,797 | 2,428 |
 
 ## Why the crawl keeps pausing here
 
