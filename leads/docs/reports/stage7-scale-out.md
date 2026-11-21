@@ -60,6 +60,7 @@ https://claude.ai/artifact/JvbTF3fXVsjukmnZmMDYZG
 | 18:04 UTC (v11; roofing arriving: 3,018 roofing leads) | 26,219 | 3,693 | 2,904 |
 | 18:30 UTC (roofing 8,474) | 31,678 | 4,684 | 3,142 |
 | 19:40 UTC (v12; HVAC and dental arriving) | 34,914 | 5,262 | 3,346 |
+| 20:01 UTC (dental 5,396, HVAC 3,540) | 40,217 | 6,194 | 3,850 |
 
 ## Why the crawl keeps pausing here
 

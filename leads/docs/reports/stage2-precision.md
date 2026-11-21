@@ -89,3 +89,8 @@ emergency 5/7, voicemail 5/7, pricing 5/7, multiple locations 4/7. **v12 fixes:*
 - Loans and project sizes are not prices.
 
 Open: electrical and auto still need their own sample (under 100 crawled sites each).
+
+**HVAC/dental spot check (12 new strong-evidence leads, v12):** 11/12 right. The one doubt is phone-only booking
+on a dental site that also shows a "Book Appointment" button. Logged, not changed: a rule for it would also
+suppress genuine "call to book an appointment" wording.
+
