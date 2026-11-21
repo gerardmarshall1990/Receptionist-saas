@@ -22,10 +22,10 @@ Read first: `docs/MASTER-SPEC.md` (the spec), `docs/ICP.md` (who we target), `do
 One stage at a time (spec §9): explore -> plan -> **wait for approval** -> implement with tests -> verify -> report
 (done / tested / untested / gaps / open questions) -> **wait for "verified"**. Commit after each green stage. Ask before adding scope.
 
-Current status: **Stage 5 (compliance gate + export) in review**. Stages 0, 1, 1b, 2, 4 verified; Stage 3
-redirected (no paid phone lookups; live Google reviews panel in the explorer).
+Current status: **Stage 6 (pilot experiment) in review**: pilot1 locked, call list ready, readout waits for
+call outcomes. Stages 0, 1, 1b, 2, 4, 5 verified; Stage 3 redirected (no paid phone lookups).
 Reports: `docs/reports/stage1-pilot-*.md`, `explorer-benchmark.md`, `stage2-crawl-pilot.md`, `stage2-precision.md`,
-`stage4-scoring-pilot.md`, `stage5-export.md`. Next: Stage 6 (pilot readout) plan.
+`stage4-scoring-pilot.md`, `stage5-export.md`, `stage6-pilot-setup.md`, `stage6-readout-pilot1.md`.
 
 ## Commands
 
@@ -87,6 +87,14 @@ uv run leads export list
 uv run leads suppress add --type phone_e164 --value "(512) 555-0100" --reason "asked not to be called"
 uv run leads suppress import optouts.csv --source "crm"   # columns: match_type,match_value[,reason]
 
+# Stage 6: pilot experiment (scored vs random unscored list). Defaults: config/experiment.yaml
+uv run leads experiment create pilot1 --seed "pilot1-2026-11-21"   # picks + FREEZES both arms
+                                 # -> data/experiments/pilot1/{call_list.csv,PROTOCOL.md,outcomes_template.csv}
+uv run leads experiment call-list pilot1   # refresh: drops anyone suppressed since
+uv run leads outcomes import calls.csv --experiment pilot1 --source dialer   # one row per attempt
+uv run leads experiment readout pilot1     # docs/reports/stage6-readout-pilot1.md
+uv run leads experiment list
+
 # browser test (needs node + playwright; runs inside pytest when TEST_DATABASE_URL is set)
 LEADS_E2E_SCREENSHOTS=/some/dir uv run pytest tests/test_explorer_e2e.py -s
 ```
@@ -107,6 +115,7 @@ config/global.yaml            release pin, calling-hours guard rail, exclusions,
                               thresholds, directory/platform domains, pilot sample sizes, watch list
 config/scoring.yaml           dimension weights, tiers, funnel fractions, signal weights, prescore points
 config/compliance.yaml        export gate: per-country rules, calling mode, DNC switch, needs_counsel list
+config/experiment.yaml        pilot design: arm size, scored tiers, attempts, primary metric, alpha/power
 config/models.yaml            LLM model names, effort, prices, token estimates (cost projection)
 config/categories/*.yaml      one file per category (file name == slug)
 src/leads_engine/settings.py  env-based runtime settings (LEADS_* vars, .env)
@@ -121,6 +130,8 @@ src/leads_engine/crawl/       fetcher.py (one site, politeness), runner.py (queu
 src/leads_engine/explorer/    app.py (FastAPI API + auth/CSP), queries.py (whitelisted SQL, keyset paging),
                               facts.py (Stage 1 facts, call windows), bench.py, static/ (no-build UI)
 src/leads_engine/compliance/  gate.py (pure gate), openers.py ($0 openers), export.py (contract, files, audit)
+src/leads_engine/experiment/  stats.py (pure), assign.py (arms + blinded call list), outcomes.py (import),
+                              readout.py (verdict + report)
 src/leads_engine/scoring/     prescore.py (pure score + components), run.py (stream, COPY, MERGE)
 src/leads_engine/universe/    overture.py (remote read), normalize.py (pure), build.py (exclude/chain/dedupe/
                               sample), load.py (Postgres upsert), report.py, pipeline.py (paths + steps)
@@ -157,6 +168,9 @@ data/                         raw/derived bulk files (Parquet). Gitignored. Neve
 - **Google Places content is never stored** (policy): only `businesses.google_place_id`. Reviews/ratings are
   fetched live in the explorer, shown with attribution, and must not feed scoring or signals without counsel.
   The key is injected by the network proxy for places.googleapis.com (X-Goog-Api-Key), not stored in the app.
+- **Experiments:** assignments are frozen (DB trigger) and the call list never shows arm, tier, score, reasons,
+  openers or any column that differs by arm. The explorer shows call history, never the arm. Change one
+  variable per experiment; the verdict rule (min n, alpha) is set before calling, in `config/experiment.yaml`.
 - **Overture release** is pinned in `global.yaml`. Bumping it requires `leads universe census` and re-confirming codes.
 - **Tests that need fixtures** (saved HTML etc.) go in `tests/fixtures/`. Never hit the network in tests.
 

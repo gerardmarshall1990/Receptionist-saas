@@ -425,6 +425,15 @@ function renderDetail(d) {
 
   body.push(complianceSection(d.compliance));
 
+  if (d.calls && d.calls.length) {
+    body.push(section(`Call history (${d.calls.length})`,
+      el("ul", { class: "facts" }, d.calls.map((c) => el("li", {},
+        el("span", { class: `pill ${c.demo_booked || c.paid ? "pill-good" : c.disposition === "do_not_call" ? "pill-bad" : "pill-muted"}` },
+          c.paid ? "paid" : c.trial_started ? "trial" : c.demo_booked ? "demo" : c.disposition.replaceAll("_", " ")),
+        el("span", {}, `${new Date(c.called_at).toLocaleString()}${c.caller ? ` · ${c.caller}` : ""}`),
+        c.notes ? el("span", { class: "muted small" }, c.notes) : null)))));
+  }
+
   // Why this lead: evidence-backed reasons only (Stage 2+). Never invented.
   const why = el("div", { class: "why" }, el("h3", {}, "Why this lead"));
   if (d.reasons.length) {

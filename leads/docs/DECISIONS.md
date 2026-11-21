@@ -2,6 +2,18 @@
 
 Newest first. One entry per decision that someone might later ask "why?" about.
 
+## 2026-11-21 — Stage 6 (pilot experiment)
+
+User took the recommended option on all four:
+- **Control = random draw from the whole callable universe**, using no score information. Its phones may be
+  `unverified` (listed by Overture, not confirmed on the site). This is a deliberate exception to the Stage 5
+  phone bar, for the comparison only; it's on the needs-counsel list. Safety rules still apply.
+- **2 arms x 1,000**, same category quotas in both arms, assignment frozen by a database trigger before any call.
+- **No openers in pilot1** (one variable at a time: targeting first, script later).
+- **Outcomes by generic CSV import**; `do_not_call` becomes a permanent suppression.
+- Website dropped from the call list after seeing that ~22% of control leads have none: it would unblind callers.
+- Verdict rule fixed in advance: no winner below 300 dialled per arm, a winner only at p < 0.05.
+
 ## 2026-11-20 — Stage 5 (compliance gate + export)
 
 User chose the recommended option on all four ("best, most efficient and purposeful"):

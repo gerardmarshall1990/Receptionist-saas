@@ -1,0 +1,14 @@
+# Stage 6 pilot experiment defaults (spec section 9: top tier vs random unscored list).
+# Bump `version` on any change; each experiment stores the values it was created with.
+version: 1
+
+per_arm: 1000            # 2 arms x 1,000 leads to dial
+scored_tiers: [A, B]     # scored arm = leads passing the Stage 5 export gate in these tiers
+max_attempts: 3          # per lead, at different call windows, same rule for both arms
+openers_in_call_list: false   # one variable at a time: pilot1 tests targeting only
+
+# Readout
+primary_metric: demo     # demo booked per lead dialed
+alpha: 0.05              # two-sided
+power: 0.80
+min_dialed_per_arm: 300  # below this the readout reports "not enough data yet", never a winner

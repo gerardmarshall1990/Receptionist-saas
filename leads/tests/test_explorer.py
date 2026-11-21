@@ -383,3 +383,28 @@ def test_export_downloads_only_gated_leads(client: TestClient, fresh_db: str) ->
             ("explorer", 1),
             ("explorer", 0),
         ]
+
+
+def test_detail_shows_call_history_but_never_the_arm(client: TestClient, fresh_db: str) -> None:
+    lead = _id(client, "Alpha Plumbing")
+    with psycopg.connect(fresh_db, autocommit=True) as conn:
+        conn.execute(
+            "insert into experiments (id, name, seed, params, config_hash)"
+            " values ('11111111-1111-1111-1111-111111111111', 'x', 's', '{}', 'h')"
+        )
+        conn.execute(
+            "insert into experiment_assignments (experiment_id, business_id, arm, call_order)"
+            " values ('11111111-1111-1111-1111-111111111111', %s, 'scored', 1)",
+            (lead,),
+        )
+        conn.execute(
+            "insert into outcomes (experiment_id, business_id, called_at, caller, disposition, demo_booked,"
+            " source) values ('11111111-1111-1111-1111-111111111111', %s, '2026-12-01T15:00:00Z', 'al',"
+            " 'decision_maker', true, 'test')",
+            (lead,),
+        )
+    r = client.get(f"/api/leads/{lead}")
+    d = r.json()
+    assert d["calls"][0]["disposition"] == "decision_maker"
+    assert d["calls"][0]["demo_booked"] is True
+    assert "scored" not in r.text  # blinded: the arm is never sent to the browser

@@ -10,7 +10,13 @@ import argparse
 import sys
 from collections.abc import Callable, Sequence
 
-from leads_engine import compliance_commands, crawl_commands, db, universe_commands
+from leads_engine import (
+    compliance_commands,
+    crawl_commands,
+    db,
+    experiment_commands,
+    universe_commands,
+)
 from leads_engine.config_loader import AppConfig, load_config, resolve_model
 from leads_engine.log import configure_logging, get_logger
 from leads_engine.settings import PROJECT_ROOT, get_settings
@@ -131,6 +137,7 @@ COMMANDS: dict[tuple[str, str], Callable[[argparse.Namespace], int]] = {
     **universe_commands.COMMANDS,
     **crawl_commands.COMMANDS,
     **compliance_commands.COMMANDS,
+    **experiment_commands.COMMANDS,
 }
 
 
@@ -145,6 +152,7 @@ def build_parser() -> argparse.ArgumentParser:
     universe_commands.add_parser(groups)
     crawl_commands.add_parser(groups)
     compliance_commands.add_parser(groups)
+    experiment_commands.add_parser(groups)
     sp = groups.add_parser("score", help="Stage 4: rule-based pre-score").add_subparsers(
         dest="command", required=True
     )

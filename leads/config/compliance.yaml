@@ -1,6 +1,6 @@
 # Stage 5 compliance gate (spec section 7). An ENGINEERING gate, not legal advice:
 # counsel must review before calling at scale. Bump `version` on any change.
-version: 1
+version: 2
 
 # Who places the calls. "human": a person dials (pilot). "ai_voice": an AI/artificial
 # voice dials; then only line types in `ai_voice_line_types` may pass (FCC 2024: AI
@@ -19,6 +19,13 @@ export:
   # Business flags that make the listed contact unsafe to use.
   blocked_business_flags: [shared_phone, website_mismatch, phone_not_on_site, no_state]
 
+# Stage 6 control arm ("a random, unscored list"). Uses NO score information: no tier,
+# reason or disqualifier rules, and the phone only needs to be a valid listed number
+# (Overture), not confirmed on the site. Every safety rule above still applies.
+control:
+  min_phone_status: unverified
+  blocked_business_flags: [shared_phone, no_state]   # set at Stage 1 for every business
+
 countries:
   US:
     enabled: true
@@ -33,6 +40,7 @@ countries:
   GB: {enabled: false, min_phone_status: verified, require_dnc_check: true, ai_voice_line_types: []}
 
 needs_counsel:
+  - "Stage 6 control arm: human calls to listed (unverified) business numbers for the pilot comparison."
   - "US: is calling a 'likely' business number (line type unknown) by a human rep acceptable without a DNC scrub?"
   - "US: state mini-TCPA laws (FL, OK, MD, WA...) on business calls, call times, Sundays/holidays."
   - "US: AI-voice outbound requires prior express consent for mobiles; we cannot tell mobile from landline yet."

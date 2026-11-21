@@ -397,6 +397,13 @@ def create_app(
                 (lead_id,),
             ).fetchall()
             compliance = cx.gate_one(c, lead_id, cfg)
+            # Call history (Stage 6). The experiment arm is deliberately NOT shown: callers
+            # use this screen, and the pilot is blinded.
+            calls = c.execute(
+                "select called_at, caller, disposition, demo_booked, trial_started, paid, notes"
+                " from outcomes where business_id = %s order by called_at desc",
+                (lead_id,),
+            ).fetchall()
             supp = c.execute(
                 "select match_type, match_value, reason, source, created_at from suppression"
                 " where (match_type = 'business_id' and match_value = %s)"
@@ -420,6 +427,7 @@ def create_app(
             "callable_now": fx.callable_now(cat, b["tz"]),
             "category_label": cat.label if cat else b["category"],
             "compliance": compliance,
+            "calls": [{k: _jsonable(v) for k, v in r.items()} for r in calls],
         }
 
     places_holder: dict[str, gx.PlacesClient] = {}

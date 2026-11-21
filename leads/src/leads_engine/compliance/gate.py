@@ -7,6 +7,7 @@ A record is exported only if `evaluate(...).status == "pass"`.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Literal
 
 from leads_engine.config_loader import PHONE_RANK, TIER_RANK, ComplianceConfig
 
@@ -54,10 +55,16 @@ def suppression_hits(inp: GateInput) -> list[str]:
     ]
 
 
-def evaluate(inp: GateInput, cfg: ComplianceConfig) -> GateResult:
+def evaluate(
+    inp: GateInput, cfg: ComplianceConfig, profile: Literal["export", "control"] = "export"
+) -> GateResult:
+    """`export`: the Stage 5 gate. `control`: the Stage 6 random-list arm, which ignores
+    everything the score knows (tier, reasons, disqualifiers, crawl-derived flags) but keeps
+    every safety rule."""
     blocks: list[str] = []
     warnings: list[str] = []
     ex = cfg.export
+    control = profile == "control"
 
     blocks += suppression_hits(inp)
 
@@ -66,12 +73,13 @@ def evaluate(inp: GateInput, cfg: ComplianceConfig) -> GateResult:
         blocks.append(f"country_not_enabled:{inp.country}")
 
     # Score: dead, below the export tier, or nothing on record to say why.
-    if inp.dead_reason:
-        blocks.append(f"dead:{inp.dead_reason}")
-    if TIER_RANK.get(inp.tier, 0) < TIER_RANK[ex.min_tier]:
-        blocks.append(f"tier_below_{ex.min_tier}")
-    if inp.n_reasons < ex.min_reasons:
-        blocks.append("no_evidence_reasons")
+    if not control:
+        if inp.dead_reason:
+            blocks.append(f"dead:{inp.dead_reason}")
+        if TIER_RANK.get(inp.tier, 0) < TIER_RANK[ex.min_tier]:
+            blocks.append(f"tier_below_{ex.min_tier}")
+        if inp.n_reasons < ex.min_reasons:
+            blocks.append("no_evidence_reasons")
 
     # Phone: present, clean, and at least as verified as the country requires.
     if not inp.phone_e164:
@@ -80,14 +88,13 @@ def evaluate(inp: GateInput, cfg: ComplianceConfig) -> GateResult:
         f for f in inp.phone_flags if f in ex.blocked_phone_flags or f.startswith("foreign:")
     )
     blocks += [f"phone_flag:{f}" for f in bad_flags]
-    if (
-        rules is not None
-        and PHONE_RANK.get(inp.phone_status, 0) < PHONE_RANK[rules.min_phone_status]
-    ):
-        blocks.append(f"phone_status_below_{rules.min_phone_status}")
-    blocks += [
-        f"business_flag:{f}" for f in sorted(inp.business_flags) if f in ex.blocked_business_flags
-    ]
+    min_phone = (
+        cfg.control.min_phone_status if control else (rules.min_phone_status if rules else None)
+    )
+    if min_phone and PHONE_RANK.get(inp.phone_status, 0) < PHONE_RANK[min_phone]:
+        blocks.append(f"phone_status_below_{min_phone}")
+    flag_rules = cfg.control.blocked_business_flags if control else ex.blocked_business_flags
+    blocks += [f"business_flag:{f}" for f in sorted(inp.business_flags) if f in flag_rules]
 
     # Calling mode / line type / DNC.
     if cfg.calling_mode == "ai_voice":

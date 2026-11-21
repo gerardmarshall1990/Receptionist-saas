@@ -506,12 +506,30 @@ class ExportRules(Strict):
         return self
 
 
+class ControlRules(Strict):
+    min_phone_status: Literal["verified", "likely", "unverified"]
+    blocked_business_flags: list[str]
+
+
 class ComplianceConfig(Strict):
     version: int
     calling_mode: Literal["human", "ai_voice"]
     export: ExportRules
+    control: ControlRules
     countries: dict[CountryCode, CountryRules]
     needs_counsel: list[str]
+
+
+class ExperimentConfig(Strict):
+    version: int
+    per_arm: Annotated[int, Field(ge=10, le=100_000)]
+    scored_tiers: list[Literal["A", "B", "C"]]
+    max_attempts: Annotated[int, Field(ge=1, le=10)]
+    openers_in_call_list: bool
+    primary_metric: Literal["reached", "conversation", "demo", "trial", "paid"]
+    alpha: Annotated[float, Field(gt=0, lt=0.5)]
+    power: Annotated[float, Field(gt=0.5, lt=1)]
+    min_dialed_per_arm: Annotated[int, Field(ge=1)]
 
 
 class AppConfig(Strict):
@@ -520,6 +538,7 @@ class AppConfig(Strict):
     models: ModelsConfig
     crawl: CrawlConfig
     compliance: ComplianceConfig
+    experiment: ExperimentConfig
     categories: dict[str, CategoryConfig]
     config_hash: str
 
@@ -599,6 +618,7 @@ def load_config(config_dir: Path) -> AppConfig:
         "models": _read_yaml(config_dir / "models.yaml"),
         "crawl": _read_yaml(config_dir / "crawl.yaml"),
         "compliance": _read_yaml(config_dir / "compliance.yaml"),
+        "experiment": _read_yaml(config_dir / "experiment.yaml"),
         "categories": {},
     }
     categories: dict[str, CategoryConfig] = {}
@@ -618,6 +638,7 @@ def load_config(config_dir: Path) -> AppConfig:
         models=ModelsConfig.model_validate(raw["models"]),
         crawl=CrawlConfig.model_validate(raw["crawl"]),
         compliance=ComplianceConfig.model_validate(raw["compliance"]),
+        experiment=ExperimentConfig.model_validate(raw["experiment"]),
         categories=categories,
         config_hash=_hash(raw),
     )
