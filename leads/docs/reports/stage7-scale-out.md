@@ -51,6 +51,7 @@ https://claude.ai/artifact/JvbTF3fXVsjukmnZmMDYZG
 | Start (3 categories) | 3,670 | 691 | — |
 | Round 2 (v8) | 8,028 | 1,245 | 883 |
 | 13:17 UTC (v9, ~50k sites crawled) | 10,203 | 1,516 | 1,158 |
+| 13:49 UTC (after a container restart; pipeline resumed) | 11,422 | 1,652 | 1,302 |
 
 ## Still open
 
