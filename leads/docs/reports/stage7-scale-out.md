@@ -1,4 +1,4 @@
-# Stage 7 — scale-out (this container: done at the disk floor)
+# Stage 7 — scale-out (resumed after page compaction)
 
 User, 2026-11-21: "keep going until done as per my specs." The database build goes ahead on open data at $0;
 calling at scale still waits for the pilot1 readout.
@@ -64,6 +64,7 @@ https://claude.ai/artifact/JvbTF3fXVsjukmnZmMDYZG
 | 20:29 UTC (dental 7,979, HVAC 4,083) | 43,384 | 6,763 | 4,204 |
 | 20:55 UTC (dental 10,082, HVAC 4,698) | 46,172 | 7,279 | 4,505 |
 | **21:23 UTC, final in this container** | **49,514** | **7,869** | **4,833** |
+| 2026-11-22 12:16 UTC (pages compacted, crawl resumed, v13) | 51,362 | 8,010 | 4,858 |
 
 ## Why the crawl keeps pausing here
 
