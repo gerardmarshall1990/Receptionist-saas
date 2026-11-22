@@ -625,3 +625,29 @@ def test_v13_word_signatures_match_whole_words() -> None:
     widget = [parse('<html><body><a class="btn">Text us</a></body></html>', "https://x.com/")]
     assert extract(widget, BIZ, CFG).signals["no_chat_widget"].value is False
     assert css  # plain-text helper still builds a page
+
+
+# v14: electrical sample.
+@pytest.mark.parametrize(
+    ("text", "signal", "expected"),
+    [
+        ("Find your perfect water system in 30 seconds. Multiple locations? Explore enterprise solutions.",
+         "multiple_locations", False),
+        ("Switches let you turn lights on and off from single or multiple locations, often called a 3-way switch.",
+         "multiple_locations", False),
+        ("Service Areas: Multiple Locations Serving Pennsylvania, New Jersey, and Delaware", "multiple_locations", True),
+        ("We're local: 5 locations. Expert electrical service.", "multiple_locations", True),
+        ("Apply now for Journeyman Electrician! Speak With Our Helpful Customer Service Reps! CALL (404) 555-0199",
+         "hiring_receptionist", False),
+        ("We're Hiring! Positions: Customer Service Representative, Service Dispatcher.", "hiring_receptionist", True),
+        ("Called and left message about the ceiling fan. Brian said he would have someone call to set up appointment.",
+         "phone_only_booking", False),
+        ("CALL TODAY TO SCHEDULE YOUR APPOINTMENT!", "phone_only_booking", True),
+        ("My power bill in August went from $320 per month to under $100.", "pricing_hints", False),
+        ("Get a whole house surge protector installed for just $250!", "pricing_hints", True),
+    ],
+)  # fmt: skip
+def test_v14_electrical_sample(text: str, signal: str, expected: bool) -> None:
+    assert (
+        signal in extract(_p(text), {"name_key": "x", "category": "electrical"}, CFG).signals
+    ) is expected

@@ -33,7 +33,9 @@ crawl_worker() {
 
 refresh() {
   echo "refresh at $(date -u +%H:%M): $(pending) sites left, $(free_gb) GB free"
-  $LEADS crawl extract          # incremental: only sites finished since the last pass
+  # While crawling: only newly crawled sites. The final refresh (after the crawl) also re-extracts
+  # sites done with an older extractor version, so a rule fix costs one full pass, not one per refresh.
+  $LEADS crawl extract ${1:---new-only}
   $LEADS score run
   $LEADS compliance check
   $LEADS export run | grep -E '^(export|files:|  (pass|blocked|candidates) )' || true
@@ -50,5 +52,5 @@ while running; do
   sleep $((MINUTES * 60))
   refresh
 done
-refresh
+refresh " "                              # final: version-aware incremental pass
 echo "done: $(psql "$LEADS_DATABASE_URL" -Atc "select count(*) from businesses where compliance_status = 'pass'") leads pass the gate"

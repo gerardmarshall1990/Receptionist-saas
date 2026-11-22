@@ -168,19 +168,21 @@ def run_extract(
     full: bool = False,
     batch: int = 8_000,
     workers: int | None = None,
+    new_only: bool = False,
 ) -> dict[str, int]:
     """Extract signals for finished sites. Incremental by default: only sites crawled since
     their last extraction, or extracted by an older EXTRACTOR_VERSION. Batches of `batch`
-    domains keep memory flat however many sites have been crawled."""
+    domains keep memory flat however many sites have been crawled. `new_only`: skip the
+    re-extraction a version bump would trigger (used while crawling; a later full pass catches up)."""
     counts: dict[str, int] = defaultdict(int)
     with psycopg.connect(url, row_factory=dict_row) as conn:
         sites = conn.execute(
             "select domain, status from crawl_sites where status = any(%s)"
             " and not (status = 'error' and attempts < %s)"
-            " and (%s or extracted_version is distinct from %s or extracted_at is null"
+            " and (%s or (not %s and extracted_version is distinct from %s) or extracted_at is null"
             "      or extracted_at < updated_at)"
             " order by domain",
-            (list(TERMINAL), cfg.crawl.max_attempts, full, EXTRACTOR_VERSION),
+            (list(TERMINAL), cfg.crawl.max_attempts, full, new_only, EXTRACTOR_VERSION),
         ).fetchall()
         counts["sites_to_extract"] = len(sites)
         for i in range(0, len(sites), batch):

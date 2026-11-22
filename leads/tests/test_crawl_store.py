@@ -156,6 +156,14 @@ def test_crawl_and_extract_end_to_end(
                 "select business_id, signal, value, evidence from signals order by 1, 2"
             ).fetchall()
 
+    # new_only skips the re-extraction an extractor-version change would trigger.
+    with psycopg.connect(fresh_db, autocommit=True) as conn:
+        conn.execute(
+            "update crawl_sites set extracted_version = 'older-version', extracted_at = now() + interval '1 minute'"
+        )
+    assert run_extract(fresh_db, CFG, tmp_path, new_only=True)["sites_to_extract"] == 0
+    assert run_extract(fresh_db, CFG, tmp_path)["sites_to_extract"] > 0
+
     serial = signal_rows()
     monkeypatch.setattr(store, "PARALLEL_MIN", 0)
     run_extract(fresh_db, CFG, tmp_path, full=True, workers=2)

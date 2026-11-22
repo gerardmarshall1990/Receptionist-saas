@@ -37,7 +37,10 @@ from leads_engine.universe import normalize as nz
 #      about a voicemail/tone; loans / project sizes are not prices.
 # v13: word signatures ("text us", "webchat") match whole words only: "text us" matched "body text use the full
 #      column" in CSS and marked sites as having a chat widget.
-EXTRACTOR_VERSION = "stage2-v13"
+# v14: electrical sample: "multiple locations" needs serving context (not "Multiple locations? Explore
+#      enterprise" or a 3-way switch "from multiple locations"); "speak with our customer service reps" isn't
+#      a job; a review's "someone call to set up appointment" isn't phone-only booking; "bill went from $320".
+EXTRACTOR_VERSION = "stage2-v14"
 SNIPPET = 300
 
 
@@ -172,6 +175,10 @@ FRONT_DESK_ROLES = _rx(
     r"call center (?:agent|rep)", r"scheduling coordinator", r"patient coordinator", r"office assistant",
     r"customer service, dispatch",
 )  # fmt: skip
+# Someone else making the call (a review): "Brian said he would have someone call to set up appointment".
+PHONE_ONLY_NOT = _rx(r"\b(?:someone|he|she|they|would)\b\W+(?:\w+\W+){0,2}$")
+# The existing team, not a job opening: "Speak with our helpful customer service reps".
+ROLE_NOT = _rx(r"\b(?:speak|talk|chat)\s+(?:with|to)\s+(?:our|one of our)\b\W+(?:\w+\W+){0,2}$")
 NEGATION = re.compile(
     r"(?:\b(?:no|not|never|without|rather than|instead of)\b|\w+n(?:'|\u2019)t\b)[^.!?]{0,60}$",
     re.I,
@@ -205,14 +212,16 @@ PRICING = _rx(
 )  # fmt: skip
 # Money that isn't a price for their service: "loans available from $500", "project sizes range from $500".
 PRICING_NOT = _rx(
-    r"\b(?:loans?|financing|project sizes?|claims?|losses|budgets?)\b\W+(?:\w+\W+){0,4}$"
+    r"\b(?:loans?|financing|project sizes?|claims?|losses|budgets?)\b\W+(?:\w+\W+){0,4}$",
+    r"\b(?:went|bills?|dropped|reduced|saved?)\b\W+(?:\w+\W+){0,4}$",  # "my power bill went from $320"
 )
 MULTI_LOCATION = _rx(
     # "Our Locations" alone is mostly a service-area heading: require a count or addresses after it.
     r"our (?:two|three|four|five|\d+) (?:convenient )?locations",
     r"\blocations:\s*\d+ ",
     r"(?:two|three|four|five|\d+) (?:convenient )?locations",
-    r"multiple locations",
+    r"\b(?:our|with|have|has|from our)\s+multiple locations",
+    r"multiple locations (?:to serve|serving|across|throughout)",
 )
 
 # Whole token only: no letters glued on either side ("info@x.comoffice" does not match).
@@ -376,14 +385,19 @@ def extract(pages: list[Page], business: dict[str, Any], cfg: AppConfig) -> Extr
         if chat
         else Hit(True, _checked(pages) + ": no chat or text widget found", home.url)
     )
-    if not booking and (h := _first(PHONE_ONLY, pages, not_near=ONLINE_FORM)):
+    if not booking and (
+        h := _first(PHONE_ONLY, pages, not_near=ONLINE_FORM, not_before=PHONE_ONLY_NOT)
+    ):
         sig["phone_only_booking"] = h
 
     # The role must sit close to the hiring wording, and the evidence must show both.
     for p in pages:
         for m in HIRING_CONTEXT.finditer(p.text):
             lo = max(0, m.start() - 150)
-            if role := FRONT_DESK_ROLES.search(p.text[lo : m.end() + 150]):
+            role = FRONT_DESK_ROLES.search(p.text[lo : m.end() + 150])
+            if role and ROLE_NOT.search(p.text[max(0, lo + role.start() - 40) : lo + role.start()]):
+                role = None  # "speak with our customer service reps": the team, not an opening
+            if role:
                 a, b = lo + role.start(), lo + role.end()
                 start, end = min(a, m.start()), max(b, m.end())
                 width = max(SNIPPET, end - start + 20)

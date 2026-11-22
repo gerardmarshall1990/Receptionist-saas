@@ -57,7 +57,9 @@ def cmd_extract(args: argparse.Namespace) -> int:
     cfg = load_config(s.config_dir)
     with recorded_run(s.database_url, "stage2.extract", cfg.config_hash, dry_run=False,
                       budget_usd=s.run_budget_usd) as run:  # fmt: skip
-        run.counts = run_extract(s.database_url, cfg, s.data_dir, full=args.full)
+        run.counts = run_extract(
+            s.database_url, cfg, s.data_dir, full=args.full, new_only=args.new_only
+        )
     print(f"extract: {json.dumps(run.counts, indent=1)}")
     return 0
 
@@ -127,6 +129,11 @@ def add_parser(groups: Any) -> None:
     )
     ex.add_argument(
         "--full", action="store_true", help="re-extract every finished site, not just new ones"
+    )
+    ex.add_argument(
+        "--new-only",
+        action="store_true",
+        help="only newly crawled sites (skip version-bump re-extraction)",
     )
     c.add_parser("status", help="queue counts")
     c.add_parser("compact", help="compact saved pages in place (keeps what extraction reads)")
