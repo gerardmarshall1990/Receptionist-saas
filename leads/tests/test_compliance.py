@@ -347,3 +347,25 @@ def test_no_opener_when_listing_name_is_not_on_the_site() -> None:
     assert contract_record(row, CFG)["opener"]
     row["flags"] = ["name_not_on_site"]
     assert contract_record(row, CFG)["opener"] is None
+
+
+@pytest.mark.db
+@needs_db
+def test_prune_keeps_headers_manifests_and_newest(fresh_db: str, tmp_path: Path) -> None:
+    from leads_engine.compliance.export import prune_exports
+
+    _seed(fresh_db, tmp_path)
+    runs = [_export(fresh_db, tmp_path) for _ in range(3)]
+    assert prune_exports(fresh_db, keep=1)["exports"] == 2
+    with psycopg.connect(fresh_db) as c:
+        left = c.execute("select export_id, count(*) from export_items group by 1").fetchall()
+        assert [str(r[0]) for r in left] == [runs[-1].export_id]
+        assert c.execute("select count(*) from exports where pruned_at is not null").fetchone() == (
+            2,
+        )
+        assert c.execute("select count(*) from exports").fetchone() == (3,)
+    for r in runs[:2]:
+        assert (r.path / "manifest.json").exists()
+        assert not (r.path / "leads.parquet").exists()
+    assert (runs[-1].path / "leads.parquet").exists()
+    assert prune_exports(fresh_db, keep=1)["exports"] == 0  # idempotent

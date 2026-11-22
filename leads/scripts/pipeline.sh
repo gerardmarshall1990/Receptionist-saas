@@ -13,6 +13,8 @@ cd "$(dirname "$0")/.."
 MINUTES="${1:-20}"
 MIN_FREE_GB="${2:-6}"
 WORKERS="${CRAWL_WORKERS:-2}"
+# Optional hard stop for the crawl (epoch seconds): the rest of the queue is the low-value tail.
+CRAWL_UNTIL="${CRAWL_UNTIL:-9999999999}"
 
 # In the Docker image `leads` is on PATH; locally it runs through uv.
 LEADS="${LEADS_CMD:-uv run leads}"
@@ -25,8 +27,9 @@ pending() {
 }
 
 crawl_worker() {
-  while (( $(free_gb) >= MIN_FREE_GB )) && (( $(pending) > 0 )); do
-    $LEADS crawl run --max-sites 100000 --minutes 30 || sleep 30
+  while (( $(free_gb) >= MIN_FREE_GB )) && (( $(pending) > 0 )) && (( $(date +%s) < CRAWL_UNTIL - 60 )); do
+    left=$(( (CRAWL_UNTIL - $(date +%s)) / 60 ))
+    $LEADS crawl run --max-sites 100000 --minutes $(( left < 30 ? left : 30 )) || sleep 30
   done
   echo "crawl worker stopping: $(pending) sites left, $(free_gb) GB free"
 }
@@ -39,6 +42,7 @@ refresh() {
   $LEADS score run
   $LEADS compliance check
   $LEADS export run | grep -E '^(export|files:|  (pass|blocked|candidates) )' || true
+  $LEADS export prune --keep 2           # each refresh writes a full export; keep the newest whole
 }
 
 pg_isready -q || { echo "postgres is down; start it and re-run"; exit 1; }

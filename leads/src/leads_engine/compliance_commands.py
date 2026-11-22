@@ -147,13 +147,23 @@ def _export_run(args: argparse.Namespace) -> int:
 def _export_list(args: argparse.Namespace) -> int:
     with psycopg.connect(get_settings().database_url) as c:
         rows = c.execute(
-            "select id, origin, created_at, n_candidates, n_passed, n_blocked, path from exports"
+            "select id, origin, created_at, n_candidates, n_passed, n_blocked, path, pruned_at"
+            " from exports"
             " order by created_at desc limit 20"
         ).fetchall()
     for r in rows:
         print(
             f"{r[2]:%Y-%m-%d %H:%M} {r[1]:<8} {r[0]} cand={r[3]} pass={r[4]} blocked={r[5]} {r[6]}"
+            + (" (pruned)" if r[7] else "")
         )
+    return 0
+
+
+def _export_prune(args: argparse.Namespace) -> int:
+    from leads_engine.compliance.export import prune_exports
+
+    res = prune_exports(get_settings().database_url, args.keep)
+    print(f"pruned {res['exports']} export(s): {res['items']:,} items, {res['files']} files")
     return 0
 
 
@@ -161,6 +171,7 @@ COMMANDS: dict[tuple[str, str], Callable[[argparse.Namespace], int]] = {
     ("compliance", "check"): _compliance_check,
     ("export", "run"): _export_run,
     ("export", "list"): _export_list,
+    ("export", "prune"): _export_prune,
     ("suppress", "add"): _suppress_add,
     ("suppress", "import"): _suppress_import,
 }
@@ -180,6 +191,8 @@ def add_parser(groups: Any) -> None:
     run.add_argument("--limit", type=int, help="top N candidates by score")
     run.add_argument("--dry-run", action="store_true", help="gate and count; write nothing")
     ep.add_parser("list", help="recent exports")
+    pr = ep.add_parser("prune", help="drop items and files of old CLI exports (headers kept)")
+    pr.add_argument("--keep", type=int, default=3, help="newest CLI exports to keep whole")
     sp = groups.add_parser("suppress", help="permanent suppression list").add_subparsers(
         dest="command", required=True
     )

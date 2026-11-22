@@ -416,3 +416,26 @@ def _write_files(
         json.dumps(manifest, indent=2, default=str), encoding="utf-8"
     )
     return out
+
+
+def prune_exports(url: str, keep: int) -> dict[str, int]:
+    """Drop items and data files of CLI exports older than the newest `keep`. Explorer exports
+    (a person downloaded them) are never pruned; header rows and manifest.json always stay."""
+    with psycopg.connect(url, row_factory=tuple_row) as conn:
+        old = conn.execute(
+            "select id, path from exports where origin = 'cli' and pruned_at is null and id not in"
+            " (select id from exports where origin = 'cli' order by created_at desc limit %s)",
+            (max(keep, 1),),
+        ).fetchall()
+        files = items = 0
+        for export_id, path in old:
+            items += conn.execute(
+                "delete from export_items where export_id = %s", (export_id,)
+            ).rowcount
+            for name in ("leads.parquet", "leads.csv"):
+                f = Path(path) / name if path else None
+                if f and f.exists():
+                    f.unlink()
+                    files += 1
+            conn.execute("update exports set pruned_at = now() where id = %s", (export_id,))
+    return {"exports": len(old), "items": items, "files": files}
