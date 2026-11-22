@@ -94,3 +94,14 @@ Open: electrical and auto still need their own sample (under 100 crawled sites e
 on a dental site that also shows a "Book Appointment" button. Logged, not changed: a rule for it would also
 suppress genuine "call to book an appointment" wording.
 
+
+**Electrical (12.8k crawled sites, v13, ~50 hits):** emergency 6/6, voicemail 6/6, owner-operated 6/6, limited
+hours 6/6, hiring 5/6, phone-only 5/6, pricing 4-5/6, multiple locations 4/6. **v14 fixes:**
+- "Multiple locations" needs serving context. Excluded: "Multiple locations? Explore enterprise solutions" and
+  a 3-way switch controlled "from multiple locations".
+- "Speak with our customer service reps" describes the team, not a job opening.
+- A review's "he would have someone call to set up appointment" isn't phone-only booking.
+- "My power bill went from $320" isn't a price.
+
+Since v14, a rule change no longer forces a full re-extract mid-crawl: refreshes extract new sites only, and one
+version-aware pass runs when the crawl ends.
