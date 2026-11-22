@@ -67,6 +67,7 @@ https://claude.ai/artifact/JvbTF3fXVsjukmnZmMDYZG
 | 2026-11-22 12:16 UTC (pages compacted, crawl resumed, v13) | 51,362 | 8,010 | 4,858 |
 | 2026-11-22 13:57 UTC (dental 24,618, plumbing 6,113) | 72,368 | 11,601 | — |
 | 2026-11-22 14:42 UTC (law 21,294, electrical 2,962) | 75,859 | 12,218 | 7,258 |
+| 2026-11-22 15:44 UTC (v15, 3rd crawl worker; auto repair 2,618) | 78,914 | 12,766 | 7,920 |
 
 ## Why the crawl keeps pausing here
 
