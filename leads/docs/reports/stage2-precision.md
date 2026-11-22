@@ -105,3 +105,12 @@ hours 6/6, hiring 5/6, phone-only 5/6, pricing 4-5/6, multiple locations 4/6. **
 
 Since v14, a rule change no longer forces a full re-extract mid-crawl: refreshes extract new sites only, and one
 version-aware pass runs when the crawl ends.
+
+**Auto repair (7.7k crawled sites, 924 gated, v14, ~70 hits graded):** phone-only booking 12/12, voicemail 10/10,
+hiring 6/6, limited hours 8/8, pricing 10/10 (coupons and fixed prices), emergency/24-7 8/12, multiple
+locations 7/8. **v15 fixes:**
+- Negated claims aren't 24/7 claims: "While we do not offer 24/7 service calls", and the FAQ "Do you offer
+  after-hours or emergency service? No."
+- A warranty or franchise network isn't the shop's own locations: "honored at over 13,000 locations".
+- Left as is: "emergency services" in a tire-application dropdown (too rare to justify a rule), and "24/7 towing"
+  (a real round-the-clock service, so it counts).

@@ -651,3 +651,24 @@ def test_v14_electrical_sample(text: str, signal: str, expected: bool) -> None:
     assert (
         signal in extract(_p(text), {"name_key": "x", "category": "electrical"}, CFG).signals
     ) is expected
+
+
+# v15: auto repair sample.
+@pytest.mark.parametrize(
+    ("text", "signal", "expected"),
+    [
+        ("Please contact us during regular business hours. While we do not offer 24/7 service calls, we're committed to you.",
+         "emergency_247_claim", False),
+        ("Do you offer after-hours or emergency service? No. We're available during shop hours.",
+         "emergency_247_claim", False),
+        ("Mon - Fri 8:30 am - 6:00 pm. 24-hour emergency services available.", "emergency_247_claim", True),
+        ("Explore Each Service 24/7 Towing. Need help getting your vehicle to us?", "emergency_247_claim", True),
+        ("Our Peace of Mind Warranty covers 24 months or 24,000 miles, honored at over 13,000 locations.",
+         "multiple_locations", False),
+        ("Two convenient locations: Austin and Lockhart, TX.", "multiple_locations", True),
+    ],
+)  # fmt: skip
+def test_v15_auto_repair_sample(text: str, signal: str, expected: bool) -> None:
+    assert (
+        signal in extract(_p(text), {"name_key": "x", "category": "auto_repair"}, CFG).signals
+    ) is expected

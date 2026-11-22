@@ -40,7 +40,7 @@ from leads_engine.universe import normalize as nz
 # v14: electrical sample: "multiple locations" needs serving context (not "Multiple locations? Explore
 #      enterprise" or a 3-way switch "from multiple locations"); "speak with our customer service reps" isn't
 #      a job; a review's "someone call to set up appointment" isn't phone-only booking; "bill went from $320".
-EXTRACTOR_VERSION = "stage2-v14"
+EXTRACTOR_VERSION = "stage2-v15"
 SNIPPET = 300
 
 
@@ -138,6 +138,9 @@ EMERGENCY_NOT = _rx(
     r"\b(?:911|caseworkers?|hotlines?|crisis line)\b\W+(?:\w+\W+){0,12}$",
     r"\b(?:online|computer|website|app)\b\W+(?:\w+\W+){0,3}$",  # "start from your phone or computer, day or night"
     r"\b(?:if|whether)\W+$",  # "determine if emergency repairs are needed"
+    # "While we do not offer 24/7 service calls"; FAQ "Do you offer after-hours or emergency service? No."
+    r"\b(?:not|never|don't|doesn't|cannot|can't)\W+(?:\w+\W+){0,3}$",
+    r"\b(?:do|does|can)\s+(?:you|we|they)\W+(?:\w+\W+){0,4}$",
 )
 # The business already has someone (or something) answering: no 24/7 pain claim then.
 COVERAGE = _rx(
@@ -222,6 +225,11 @@ MULTI_LOCATION = _rx(
     r"(?:two|three|four|five|\d+) (?:convenient )?locations",
     r"\b(?:our|with|have|has|from our)\s+multiple locations",
     r"multiple locations (?:to serve|serving|across|throughout)",
+)
+# A franchise or warranty network, not the shop: "warranty honored at over 13,000 locations".
+MULTI_LOCATION_NOT = _rx(
+    r"\b(?:honou?red|valid|accepted|good|redeemable)\s+at\s+(?:over\s+|more than\s+|any of\s+)?[\d,]*$",
+    r"\b(?:nationwide|across the country)\W+(?:\w+\W+){0,3}[\d,]*$",
 )
 
 # Whole token only: no letters glued on either side ("info@x.comoffice" does not match).
@@ -411,7 +419,7 @@ def extract(pages: list[Page], business: dict[str, Any], cfg: AppConfig) -> Extr
     # --- value / fit -------------------------------------------------------
     if h := _first(PRICING, pages, not_before=PRICING_NOT):
         sig["pricing_hints"] = h
-    if h := _first(MULTI_LOCATION, pages):
+    if h := _first(MULTI_LOCATION, pages, not_before=MULTI_LOCATION_NOT):
         sig["multiple_locations"] = h
     if "is_chain" not in sig and (h := _first(OWNER_OPERATED, pages, not_before=OWNER_NOT)):
         sig["owner_operated"] = h
