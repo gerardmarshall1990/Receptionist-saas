@@ -192,3 +192,14 @@ User chose the recommended option on all four ("best, most efficient and purpose
   Proposal: plan it as its own stage right after Stage 1, so it's built against real pilot rows and real column shapes.
   It needs server-side filtering and pagination plus the right Postgres indexes to stay fast at 3M rows. Scope to be
   agreed before it's built.
+
+## 2026-11-22: Stop the US crawl at the low-value tail
+- The last ~72k queued sites were almost all auto repair (the lowest-value niche) plus retries of
+  failed sites. Dead domains (connect errors) are now final; only transient failures (proxy, timeout,
+  5xx) were retried. `CRAWL_UNTIL` gives the pipeline a hard stop.
+- Each refresh wrote a full export (~120 MB of files plus ~580 MB of `export_items`).
+  `leads export prune --keep N` drops the items and files of old CLI exports and keeps their header
+  rows and manifests. Explorer exports are never pruned.
+- The final version pass uses `crawl extract --tiers A,B`. Rule fixes since v13 almost only remove
+  false positives, so they can only move leads that are already exportable. Re-extracting every site
+  would take ~2.6 h of CPU for a near-identical list; a full pass can still run later.

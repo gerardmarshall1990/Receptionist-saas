@@ -58,7 +58,12 @@ def cmd_extract(args: argparse.Namespace) -> int:
     with recorded_run(s.database_url, "stage2.extract", cfg.config_hash, dry_run=False,
                       budget_usd=s.run_budget_usd) as run:  # fmt: skip
         run.counts = run_extract(
-            s.database_url, cfg, s.data_dir, full=args.full, new_only=args.new_only
+            s.database_url,
+            cfg,
+            s.data_dir,
+            full=args.full,
+            new_only=args.new_only,
+            tiers=[t for t in (args.tiers or "").split(",") if t] or None,
         )
     print(f"extract: {json.dumps(run.counts, indent=1)}")
     return 0
@@ -135,6 +140,7 @@ def add_parser(groups: Any) -> None:
         action="store_true",
         help="only newly crawled sites (skip version-bump re-extraction)",
     )
+    ex.add_argument("--tiers", help="comma-separated tiers: limit version re-extraction to them")
     c.add_parser("status", help="queue counts")
     c.add_parser("compact", help="compact saved pages in place (keeps what extraction reads)")
     c.add_parser("report", help="write docs/reports/stage2-crawl-pilot.md")

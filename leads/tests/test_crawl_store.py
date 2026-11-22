@@ -162,6 +162,10 @@ def test_crawl_and_extract_end_to_end(
             "update crawl_sites set extracted_version = 'older-version', extracted_at = now() + interval '1 minute'"
         )
     assert run_extract(fresh_db, CFG, tmp_path, new_only=True)["sites_to_extract"] == 0
+    # tiers limits version re-extraction to businesses in those tiers.
+    with psycopg.connect(fresh_db, autocommit=True) as conn:
+        conn.execute("update businesses set tier = 'D'")
+    assert run_extract(fresh_db, CFG, tmp_path, tiers=["A", "B"])["sites_to_extract"] == 0
     assert run_extract(fresh_db, CFG, tmp_path)["sites_to_extract"] > 0
 
     serial = signal_rows()
