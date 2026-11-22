@@ -63,18 +63,25 @@ def cmd_extract(args: argparse.Namespace) -> int:
 
 
 def cmd_compact(args: argparse.Namespace) -> int:
-    """Compact saved pages in place (frees ~58% of page storage; extraction results unchanged)."""
+    """Compact saved pages in place (frees ~58% of page storage; extraction results unchanged).
+    Files are rewritten in parallel across CPUs; already compacted files are skipped."""
+    import os
+    from concurrent.futures import ProcessPoolExecutor
+
     s = get_settings()
     sigs = all_signatures(load_config(s.config_dir))
     files = sorted((s.data_dir / "crawl" / "pages").glob("*.parquet"))
     before = after = 0
-    for i, f in enumerate(files, 1):
-        b, a = compact_file(f, sigs)
-        before, after = before + b, after + a
-        if i % 50 == 0 or i == len(files):
-            print(
-                f"{i}/{len(files)} files: {before / 1e9:.2f} GB -> {after / 1e9:.2f} GB", flush=True
-            )
+    with ProcessPoolExecutor(max_workers=os.cpu_count() or 2) as pool:
+        for i, (b, a) in enumerate(
+            pool.map(compact_file, files, [sigs] * len(files), chunksize=4), 1
+        ):
+            before, after = before + b, after + a
+            if i % 100 == 0 or i == len(files):
+                print(
+                    f"{i}/{len(files)} files: {before / 1e9:.2f} GB -> {after / 1e9:.2f} GB",
+                    flush=True,
+                )
     return 0
 
 
