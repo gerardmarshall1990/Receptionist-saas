@@ -15,6 +15,7 @@ from typing import Any
 import phonenumbers
 
 from leads_engine.config_loader import AppConfig, CategoryConfig
+from leads_engine.crawl.compact import signature_in
 from leads_engine.crawl.html import Page
 from leads_engine.universe import normalize as nz
 
@@ -34,7 +35,9 @@ from leads_engine.universe import normalize as nz
 # v12: second roofing sample: "our locations" alone is usually a service-area heading; online tools "day or night";
 #      "if emergency repairs are needed"; supplier comparison tables; "leave your name and number" must be
 #      about a voicemail/tone; loans / project sizes are not prices.
-EXTRACTOR_VERSION = "stage2-v12"
+# v13: word signatures ("text us", "webchat") match whole words only: "text us" matched "body text use the full
+#      column" in CSS and marked sites as having a chat widget.
+EXTRACTOR_VERSION = "stage2-v13"
 SNIPPET = 300
 
 
@@ -275,7 +278,7 @@ def _any_negated(rx: re.Pattern[str], pages: list[Page]) -> Hit | None:
 def _signature(sigs: list[str], pages: list[Page]) -> tuple[str, str] | None:
     for p in pages:
         for s in sigs:
-            if s in p.raw_lower:
+            if signature_in(s, p.raw_lower):
                 return s, p.url
     return None
 

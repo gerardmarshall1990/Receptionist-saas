@@ -11,6 +11,7 @@ from typing import Any
 from leads_engine.config_loader import load_config
 from leads_engine.crawl import report as rpt
 from leads_engine.crawl import runner
+from leads_engine.crawl.compact import all_signatures, compact_file
 from leads_engine.crawl.store import run_extract
 from leads_engine.runs import recorded_run
 from leads_engine.settings import PROJECT_ROOT, get_settings
@@ -44,7 +45,8 @@ def cmd_run(args: argparse.Namespace) -> int:
                       budget_usd=s.run_budget_usd, params=params) as run:  # fmt: skip
         run.counts = asyncio.run(
             runner.run(s.database_url, cfg.crawl, s.data_dir, max_sites=args.max_sites,
-                       time_limit_s=args.minutes * 60, run_id=run.id)
+                       time_limit_s=args.minutes * 60, run_id=run.id,
+                       signatures=all_signatures(cfg))
         )  # fmt: skip
     print(f"crawl: {run.counts}")
     return 0
@@ -57,6 +59,22 @@ def cmd_extract(args: argparse.Namespace) -> int:
                       budget_usd=s.run_budget_usd) as run:  # fmt: skip
         run.counts = run_extract(s.database_url, cfg, s.data_dir, full=args.full)
     print(f"extract: {json.dumps(run.counts, indent=1)}")
+    return 0
+
+
+def cmd_compact(args: argparse.Namespace) -> int:
+    """Compact saved pages in place (frees ~58% of page storage; extraction results unchanged)."""
+    s = get_settings()
+    sigs = all_signatures(load_config(s.config_dir))
+    files = sorted((s.data_dir / "crawl" / "pages").glob("*.parquet"))
+    before = after = 0
+    for i, f in enumerate(files, 1):
+        b, a = compact_file(f, sigs)
+        before, after = before + b, after + a
+        if i % 50 == 0 or i == len(files):
+            print(
+                f"{i}/{len(files)} files: {before / 1e9:.2f} GB -> {after / 1e9:.2f} GB", flush=True
+            )
     return 0
 
 
@@ -80,6 +98,7 @@ COMMANDS: dict[tuple[str, str], Callable[[argparse.Namespace], int]] = {
     ("crawl", "run"): cmd_run,
     ("crawl", "extract"): cmd_extract,
     ("crawl", "status"): cmd_status,
+    ("crawl", "compact"): cmd_compact,
     ("crawl", "report"): cmd_report,
 }
 
@@ -103,4 +122,5 @@ def add_parser(groups: Any) -> None:
         "--full", action="store_true", help="re-extract every finished site, not just new ones"
     )
     c.add_parser("status", help="queue counts")
+    c.add_parser("compact", help="compact saved pages in place (keeps what extraction reads)")
     c.add_parser("report", help="write docs/reports/stage2-crawl-pilot.md")

@@ -611,3 +611,17 @@ def test_v12_roofing_sample(text: str, signal: str, expected: bool) -> None:
         signal
         in extract(_p(text), {"name_key": "x", "category": "roofing_restoration"}, CFG).signals
     ) is expected
+
+
+def test_v13_word_signatures_match_whole_words() -> None:
+    css = _p("<style>/* Let banner body text use the full content column */</style> Welcome")
+    page = [
+        parse(
+            "<html><body><style>/* Let banner body text use the full column */</style><p>Welcome</p></body></html>",
+            "https://x.com/",
+        )
+    ]
+    assert extract(page, BIZ, CFG).signals["no_chat_widget"].value is True
+    widget = [parse('<html><body><a class="btn">Text us</a></body></html>', "https://x.com/")]
+    assert extract(widget, BIZ, CFG).signals["no_chat_widget"].value is False
+    assert css  # plain-text helper still builds a page

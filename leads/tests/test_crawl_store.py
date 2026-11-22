@@ -218,3 +218,49 @@ def test_circuit_breaker_stops_on_repeated_local_errors(
     with psycopg.connect(fresh_db) as conn:
         rows = conn.execute("select status, max(attempts) from crawl_sites group by 1").fetchall()
     assert rows == [("pending", 0)]  # nothing burned, nothing stuck in "running"
+
+
+def test_compacting_saved_pages_keeps_extraction_identical(tmp_path: Path) -> None:
+    import gzip
+
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    from leads_engine.crawl.compact import all_signatures, compact_file
+    from leads_engine.crawl.extract import extract
+    from leads_engine.crawl.fetcher import decode
+    from leads_engine.crawl.html import parse
+    from leads_engine.crawl.runner import PAGE_SCHEMA
+
+    page_html = (
+        "<html><head><title>Joe's Plumbing</title><style>.x{color:red} /* body text use */</style>"
+        "<script>var s='<style>'; loadWidget('https://embed.tawk.to/abc');</script></head>"
+        "<body><!-- note --><h1>Joe's Plumbing</h1><p>If we miss your call, leave a voicemail.</p>"
+        "<p>Call (512) 474-1234 or email <a href='mailto:office@joesplumbing.com'>us</a></p>"
+        "<a href='/book'>Book Now</a></body></html>"
+    )
+    row = {"domain": "joesplumbing.com", "url": "https://joesplumbing.com/", "final_url": "https://joesplumbing.com/",
+           "kind": "home", "http_status": 200, "content_type": "text/html; charset=iso-8859-1", "bytes": len(page_html),
+           "truncated": False, "content_hash": "h", "fetched_at": None, "requested_at": None,
+           "html_gz": gzip.compress(page_html.encode("latin-1")), "compacted": None}  # fmt: skip
+    path = tmp_path / "p.parquet"
+    pq.write_table(pa.Table.from_pylist([row], schema=PAGE_SCHEMA), path)
+    sigs = all_signatures(CFG)
+
+    def signals() -> dict[str, object]:
+        r = pq.read_table(path).to_pylist()[0]
+        page = parse(decode(gzip.decompress(r["html_gz"]), r["content_type"]), r["final_url"])
+        ex = extract(
+            [page],
+            {"name_key": "joes plumbing", "category": "plumbing", "phone": "+15124741234"},
+            CFG,
+        )
+        return {"sig": {k: (v.value, v.evidence) for k, v in ex.signals.items()}, "emails": ex.emails,
+                "phones": ex.phones, "flags": ex.flags}  # fmt: skip
+
+    before = signals()
+    b, a = compact_file(path, sigs)
+    assert a < b * 2  # rewritten (tiny fixture: size is not the point)
+    assert signals() == before
+    assert pq.read_table(path).column("compacted").to_pylist() == [True]
+    assert compact_file(path, sigs) == (a, a)  # idempotent

@@ -22,7 +22,15 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from leads_engine.config_loader import CrawlConfig
-from leads_engine.crawl.fetcher import LOCAL_ERROR, Fetched, SiteResult, crawl_site, make_client
+from leads_engine.crawl.compact import compact_html
+from leads_engine.crawl.fetcher import (
+    LOCAL_ERROR,
+    Fetched,
+    SiteResult,
+    crawl_site,
+    decode,
+    make_client,
+)
 from leads_engine.log import get_logger
 
 LOCK_STALE = "15 minutes"
@@ -42,6 +50,8 @@ PAGE_SCHEMA = pa.schema(
         ("fetched_at", pa.timestamp("us", tz="UTC")),
         ("requested_at", pa.timestamp("us", tz="UTC")),
         ("html_gz", pa.binary()),
+        # True: html_gz holds compact_html() output as UTF-8 (content_type says so).
+        ("compacted", pa.bool_()),
     ]
 )
 
@@ -102,20 +112,25 @@ def claim(
     return [(r[0], r[1]) for r in rows]
 
 
-def _page_row(r: SiteResult, p: Fetched) -> dict[str, Any]:
+def _page_row(r: SiteResult, p: Fetched, signatures: tuple[str, ...] = ()) -> dict[str, Any]:
+    body, content_type, compacted = p.body, p.content_type, False
+    if signatures:
+        body = compact_html(decode(p.body, p.content_type), signatures).encode("utf-8")
+        content_type, compacted = "text/html; charset=utf-8", True
     return {
         "domain": r.domain,
         "url": p.url,
         "final_url": p.final_url,
         "kind": p.kind,
         "http_status": p.status,
-        "content_type": p.content_type,
+        "content_type": content_type,
         "bytes": len(p.body),
         "truncated": p.truncated,
         "content_hash": p.content_hash,
         "fetched_at": p.fetched_at,
         "requested_at": p.requested_at,
-        "html_gz": gzip.compress(p.body),
+        "html_gz": gzip.compress(body),
+        "compacted": compacted,
     }
 
 
@@ -130,6 +145,7 @@ _INSERT_PAGE = (
 class Buffer:
     out_dir: Path
     run_id: str
+    signatures: tuple[str, ...] = ()
     results: list[SiteResult] = field(default_factory=list)
     seq: int = 0
     counts: dict[str, int] = field(default_factory=dict)
@@ -142,7 +158,7 @@ class Buffer:
     def flush(self, conn: psycopg.Connection[Any], max_attempts: int) -> None:
         if not self.results:
             return
-        rows = [_page_row(r, p) for r in self.results for p in r.pages]
+        rows = [_page_row(r, p, self.signatures) for r in self.results for p in r.pages]
         path: Path | None = None
         if rows:
             self.out_dir.mkdir(parents=True, exist_ok=True)
@@ -202,10 +218,12 @@ async def run(
     max_sites: int,
     time_limit_s: float,
     run_id: str | None = None,
+    signatures: tuple[str, ...] = (),
 ) -> dict[str, int]:
+    """`signatures`: when given, saved pages are compacted (crawl/compact.py)."""
     run_id = run_id or str(uuid.uuid4())
     worker = f"{socket.gethostname()}:{os.getpid()}"
-    buf = Buffer(data_dir / "crawl" / "pages", run_id)
+    buf = Buffer(data_dir / "crawl" / "pages", run_id, signatures)
     deadline = time.monotonic() + time_limit_s
     claimed = 0
     sem = asyncio.Semaphore(cfg.concurrency_sites)
