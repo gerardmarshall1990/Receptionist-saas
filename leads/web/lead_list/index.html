@@ -136,7 +136,15 @@ const SIGNAL = {
 };
 const label = (g) => SIGNAL[g] || g.replaceAll("_", " ");
 const STRONG = new Set(["leave_message_text", "hiring_receptionist", "phone_only_booking"]);
-const isStrong = (d) => d.r.some((r) => STRONG.has(r.g));
+const isStrong = (d) => d.g.some((g) => STRONG.has(g));
+// Details (reasons, email, website, call window, opener) live in 64 shards fetched on demand.
+const shardCache = new Map();
+function shardFor(id) {
+  const n = parseInt(id.slice(0, 2), 16) % DATA.shards;
+  const name = `${DATA.shard_dir}/d-${String(n).padStart(2, "0")}.json`;
+  if (!shardCache.has(name)) shardCache.set(name, fetch(name).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); }));
+  return shardCache.get(name);
+}
 const CATEGORY = { plumbing: "Plumbing", hvac: "HVAC", dental: "Dental", law_small: "Law firm", roofing_restoration: "Roofing",
   electrical: "Electrical", auto_repair: "Auto repair" };
 const catLabel = (c) => CATEGORY[c] || c;
@@ -162,7 +170,7 @@ function apply() {
   const digits = q.replace(/\D/g, "");
   rows = DATA.leads.filter((d) =>
     (!state.cat || d.c === state.cat) && (!state.tier || d.t === state.tier) && (!state.st || d.st === state.st) &&
-    (!state.email || d.em) && (!state.opener || d.o) && (!state.strong || isStrong(d)) &&
+    (!state.email || d.e) && (!state.opener || d.o) && (!state.strong || isStrong(d)) &&
     (!q || `${d.n} ${d.ci} ${d.st}`.toLowerCase().includes(q) || (digits.length >= 4 && (d.ph || "").includes(digits))));
   shown = 100;
   render();
@@ -173,7 +181,7 @@ function render() {
   $("#summary").replaceChildren(
     el("span", {}, el("b", {}, fmt.format(rows.length)), " leads shown"),
     el("span", {}, el("b", {}, fmt.format(a)), " tier A · ", el("b", {}, fmt.format(rows.length - a)), " tier B"),
-    el("span", {}, el("b", {}, fmt.format(rows.filter((d) => d.em).length)), " with email"),
+    el("span", {}, el("b", {}, fmt.format(rows.filter((d) => d.e).length)), " with email"),
     el("span", {}, el("b", {}, fmt.format(rows.filter((d) => d.o).length)), " with an opener"),
     el("span", {}, el("b", {}, fmt.format(rows.filter(isStrong).length)), " with strong evidence"));
   const list = $("#list");
@@ -184,8 +192,8 @@ function render() {
     el("span", { class: "score" }, el("span", { class: `tier tier-${d.t}` }, d.t), String(Math.round(d.s))),
     el("div", { class: "c2" }, el("div", { class: "name" }, d.n), el("div", { class: "sub" }, catLabel(d.c))),
     el("div", { class: "c3 mono" }, phoneText(d.ph)),
-    el("div", { class: "c4" }, el("div", {}, `${d.ci || ""}${d.ci ? ", " : ""}${d.st || ""}`), el("div", { class: "sub" }, (d.win || "").replace(/\s*\(.*\)$/, ""))),
-    el("div", { class: "c5 pills" }, d.r.slice(0, 2).map((r) => el("span", { class: "pill ac" }, label(r.g))), d.em ? el("span", { class: "pill ok" }, "email") : null))));
+    el("div", { class: "c4" }, el("div", {}, `${d.ci || ""}${d.ci ? ", " : ""}${d.st || ""}`)),
+    el("div", { class: "c5 pills" }, d.g.slice(0, 2).map((g) => el("span", { class: "pill ac" }, label(g))), d.e ? el("span", { class: "pill ok" }, "email") : null))));
   $("#more").hidden = rows.length <= shown;
   $("#more").textContent = `Show ${Math.min(100, rows.length - shown)} more of ${fmt.format(rows.length - shown)}`;
 }
@@ -193,30 +201,38 @@ function render() {
 function open(d) {
   selected = d.id;
   render();
-  const site = d.w && safeUrl(d.w);
-  const phoneVal = el("span", { class: "mono" }, phoneText(d.ph));
   const sheet = $("#sheet");
-  sheet.replaceChildren(
+  const phoneVal = el("span", { class: "mono" }, phoneText(d.ph));
+  const head = [
     el("button", { class: "btn close", type: "button", "aria-label": "Close", onclick: close }, "✕"),
     el("h2", {}, d.n),
     el("div", { class: "sub" }, `${catLabel(d.c)} · ${d.ci || ""}${d.ci ? ", " : ""}${d.st || ""}`),
     el("div", { class: "sec" }, el("div", { class: "score" }, el("span", { class: `tier tier-${d.t}` }, d.t), el("b", {}, `Score ${Math.round(d.s)}`),
       el("span", { class: "pill ok" }, "Passed compliance gate"))),
-    el("div", { class: "sec" }, el("h3", {}, "Contact"), el("dl", { class: "kv" },
-      el("dt", {}, "Phone"), el("dd", {}, phoneVal, el("button", { class: "btn sm", type: "button", onclick: (e) => copy(d.ph, e.currentTarget) }, "Copy"), el("span", { class: "pill ok" }, "on their own site")),
-      el("dt", {}, "Email"), el("dd", {}, d.em ? el("span", { class: "mono" }, d.em) : el("span", { class: "note" }, "None published on their site")),
-      el("dt", {}, "Website"), el("dd", {}, site ? el("a", { href: site, target: "_blank", rel: "noopener noreferrer nofollow" }, host(site)) : "—"),
-      el("dt", {}, "Call window"), el("dd", {}, d.win || "—"))),
-    el("div", { class: "sec" }, el("h3", {}, "Opener"), d.o
-      ? el("div", { class: "opener" }, el("q", {}, d.o))
-      : el("p", { class: "note" }, "None: no stored reason is strong enough to open with.")),
-    el("div", { class: "sec" }, el("h3", {}, "Why this lead (quoted from their website)"),
-      d.r.map((r) => { const u = safeUrl(r.u); return el("div", { class: "reason" }, el("b", {}, label(r.g)), el("q", {}, r.e),
-        u ? el("a", { href: u, target: "_blank", rel: "noopener noreferrer nofollow", class: "note" }, `Source: ${host(u)}`) : null); })),
-    el("p", { class: "note" }, "Line type (mobile or landline) is unknown and no Do-Not-Call scrub has been done. Cleared for human-dialled calls only."));
+  ];
+  sheet.replaceChildren(...head, el("p", { class: "note" }, "Loading details…"));
   sheet.hidden = false;
   sheet.scrollTop = 0;
   sheet.querySelector(".close").focus();
+  shardFor(d.id).then((shard) => {
+    if (selected !== d.id) return;
+    const x = shard[d.id] || { r: [] };
+    const site = x.w && safeUrl(x.w);
+    sheet.replaceChildren(...head,
+      el("div", { class: "sec" }, el("h3", {}, "Contact"), el("dl", { class: "kv" },
+        el("dt", {}, "Phone"), el("dd", {}, phoneVal, el("button", { class: "btn sm", type: "button", onclick: (e) => copy(d.ph, e.currentTarget) }, "Copy"), el("span", { class: "pill ok" }, "on their own site")),
+        el("dt", {}, "Email"), el("dd", {}, x.em ? el("span", { class: "mono" }, x.em) : el("span", { class: "note" }, "None published on their site")),
+        el("dt", {}, "Website"), el("dd", {}, site ? el("a", { href: site, target: "_blank", rel: "noopener noreferrer nofollow" }, host(site)) : "—"),
+        el("dt", {}, "Call window"), el("dd", {}, x.win || "—"))),
+      el("div", { class: "sec" }, el("h3", {}, "Opener"), x.o
+        ? el("div", { class: "opener" }, el("q", {}, x.o))
+        : el("p", { class: "note" }, "None: no stored reason is strong enough to open with.")),
+      el("div", { class: "sec" }, el("h3", {}, "Why this lead (quoted from their website)"),
+        x.r.map((r) => { const u = safeUrl(r.u); return el("div", { class: "reason" }, el("b", {}, label(r.g)), el("q", {}, r.e),
+          u ? el("a", { href: u, target: "_blank", rel: "noopener noreferrer nofollow", class: "note" }, `Source: ${host(u)}`) : null); })),
+      el("p", { class: "note" }, "Line type (mobile or landline) is unknown and no Do-Not-Call scrub has been done. Cleared for human-dialled calls only."));
+    sheet.querySelector(".close").focus();
+  }).catch(() => { if (selected === d.id) sheet.replaceChildren(...head, el("p", { class: "note" }, "Details didn't load. Close and open the lead again.")); });
 }
 function close() { selected = null; $("#sheet").hidden = true; render(); }
 
@@ -226,7 +242,7 @@ async function init() {
     res = await fetch("index.json");
     if (!res.ok) throw new Error(res.status);
     DATA = await res.json();
-    const parts = await Promise.all(DATA.parts.map(async (name) => {
+    const parts = await Promise.all(DATA.list.map(async (name) => {
       const r = await fetch(name);
       if (!r.ok) throw new Error(r.status);
       return r.json();
