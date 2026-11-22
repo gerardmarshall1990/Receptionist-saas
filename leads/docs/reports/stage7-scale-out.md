@@ -68,6 +68,7 @@ https://claude.ai/artifact/JvbTF3fXVsjukmnZmMDYZG
 | 2026-11-22 13:57 UTC (dental 24,618, plumbing 6,113) | 72,368 | 11,601 | — |
 | 2026-11-22 14:42 UTC (law 21,294, electrical 2,962) | 75,859 | 12,218 | 7,258 |
 | 2026-11-22 15:44 UTC (v15, 3rd crawl worker; auto repair 2,618) | 78,914 | 12,766 | 7,920 |
+| **2026-11-22 18:15 UTC, USA final (v15 pass on all tier A/B sites)** | **83,503** | **13,459** | **8,891** |
 
 ## Why the crawl keeps pausing here
 
@@ -111,3 +112,27 @@ https://claude.ai/artifact/JvbTF3fXVsjukmnZmMDYZG.
 - Accuracy samples for electrical and auto: there aren't enough crawled sites yet (roofing graded, v11).
 - Lasting host, so the crawl can go past the container's disk (`docs/DEPLOY.md`).
 - 3M target vs 7 categories.
+
+## USA final (2026-11-22)
+
+83,503 leads pass the compliance gate across 51 states and DC. Every lead has a phone found on the business's
+own site, a score, evidence-backed reasons and a gate pass.
+
+| Niche | Leads | Tier A |
+|---|---:|---:|
+| Dental | 25,116 | 4,245 |
+| Law (small firms) | 21,345 | 2,556 |
+| Roofing / restoration | 10,795 | 1,969 |
+| HVAC | 9,596 | 1,936 |
+| Auto repair | 7,110 | 1,215 |
+| Plumbing | 6,133 | 992 |
+| Electrical | 3,408 | 546 |
+
+- 54,120 leads have an email found on their own site.
+- 28,218 have an evidence-based opener.
+- 8,891 have strong evidence: "leave a message", hiring a receptionist, or phone-only booking.
+
+What was not crawled:
+- About 72k auto repair sites, the lowest-value niche, lowest priority first. Resuming costs nothing: run
+  `scripts/pipeline.sh`.
+- About 50k dead domains (connection refused), marked final.
