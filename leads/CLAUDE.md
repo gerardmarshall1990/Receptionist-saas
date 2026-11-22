@@ -77,6 +77,7 @@ uv run leads crawl run --max-sites 1000 --minutes 60   # resumable; safe to run 
 uv run leads crawl status
 uv run leads crawl extract       # no network, incremental (new/changed sites); --full after changing rules
 uv run leads crawl report        # docs/reports/stage2-crawl-pilot.md (incl. 100-hit review sample)
+uv run leads crawl compact       # shrink saved pages ~58% (new pages are saved compacted already)
 
 # Stage 7: scale-out loop (best-first crawl rounds -> extract -> score -> gate -> export; resumable)
 uv run leads universe load --all --categories plumbing,hvac,electrical,roofing_restoration,dental,law_small,auto_repair
@@ -137,7 +138,8 @@ src/leads_engine/db.py        Postgres connect + migration runner; DuckDB for Pa
 src/leads_engine/cli.py       `leads` command (+ universe_commands.py)
 src/leads_engine/runs.py      every job records a `runs` row; hard budget stop
 src/leads_engine/crawl/       fetcher.py (one site, politeness), runner.py (queue + Parquet page store),
-                              html.py (parse), extract.py (signal rules), store.py (DB writes), report.py
+                              html.py (parse), extract.py (signal rules), store.py (DB writes), report.py,
+                              compact.py (page compaction + the one signature-matching rule)
 src/leads_engine/explorer/    app.py (FastAPI API + auth/CSP), queries.py (whitelisted SQL, keyset paging),
                               facts.py (Stage 1 facts, call windows), bench.py, static/ (no-build UI)
 src/leads_engine/compliance/  gate.py (pure gate), openers.py ($0 openers), export.py (contract, files, audit)

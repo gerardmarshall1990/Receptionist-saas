@@ -2,6 +2,21 @@
 
 Newest first. One entry per decision that someone might later ask "why?" about.
 
+## 2026-11-22 — Saved pages are compacted so the whole US crawl fits
+
+User: "go ahead as many as possible. once usa done tell me." The disk floor stopped the crawl at 221k of 462k sites.
+- **What's dropped:** saved pages lose `<style>` bodies and inline `<script>` bodies. A script keeps a marker
+  listing any configured signature it contained. Tags, attributes, comments and visible text are untouched.
+- **Measured on 1,200 random pages (517 sites):** 57-59% smaller, **zero** differences in extracted signals,
+  emails, phones or flags. The first attempt (also stripping comments and whitespace) changed 24 sites, so those
+  are kept.
+- **Result:** 16.4 GB -> 6.1 GB of existing pages. New pages are compacted when saved (~28 KB per site), so the
+  remaining ~240k US sites need about 7 GB.
+- **Cost:** a widget signature added to config later can't be found inside inline scripts of already-compacted
+  pages (script `src` URLs are kept, so domain signatures still work). That case needs a re-crawl.
+- **Bug found on the way (v13):** the signature "text us" matched CSS like "body text use the full column" and
+  marked sites as having a chat widget. Word signatures now match whole words only.
+
 ## 2026-11-21 — Stage 7 database build starts before the pilot readout
 
 User: "go ahead as per most efficient route. I need to see list pretty soon so keep going until done as per my
