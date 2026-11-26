@@ -50,9 +50,60 @@ from outcomes (Stage 8).
 | 5 | Dental | b | 0.85 | New-patient calls missed at lunch/after hours; high patient lifetime value |
 | 6 | Small law (PI, family, criminal) | - | 0.95 | Each client worth a lot; crisis callers won't leave voicemail |
 | 7 | Auto repair and body | - | 0.55 | Mechanics under cars; steady booking calls |
+| 8 | Locksmith | tier1 | 0.60 | Lockouts are urgent; one-person vans miss calls |
+| 9 | Towing / roadside | tier1 | 0.65 | Stranded drivers call the next company in seconds |
+| 10 | Garage door repair | tier1 | 0.75 | Broken springs trap the car; techs on ladders |
+| 11 | Pest control | tier1 | 0.65 | Urgent finds (termites, bed bugs); recurring plans |
+| 12 | Septic | tier1 | 0.75 | Backups are emergencies; owner in the truck |
+| 13 | Chiropractic | tier1 | 0.70 | New-patient calls missed during adjustments (HIPAA: needs counsel) |
+| 14 | Veterinary | tier1 | 0.75 | Swamped front desks; worried owners call the next clinic |
+| 6 (ext.) | Law: immigration, estate/probate, bankruptcy | tier1 | 0.95 | High-value clients; crisis callers |
 
-Watch list (not configured): veterinary, med spa/salon, property management, locksmith/towing/garage door,
-real estate agency.
+Tier 1 rows are loaded with `niche_batch = tier1-pilot` and stay compliance **pending** (never pass) until DNC,
+line type and country rules are checked (`config/compliance.yaml: export.pending_batches`). Already covered
+by existing categories: orthodontics (dental), water heater installation (plumbing), drain cleaning (no
+Overture code; under plumbing). Census and per-state counts: `docs/reports/tier1-universe.md`.
+
+### 2b. Planned Tier 2 and Tier 3 (mapped, not configured)
+
+Overture codes from the 2026-11-18.0 census (US, primary, raw rows). Configs are written when each tier starts.
+
+| Tier | Niche | Overture codes (raw rows) |
+|---|---|---|
+| 2 | Appliance repair | `appliance_repair_service` 12,444 |
+| 2 | Handyman | `handyman` 8,906 |
+| 2 | Landscaping / lawn | `landscaping` 55,572, `lawn_service` 6,953 |
+| 2 | Tree service | `tree_service` 19,525 |
+| 2 | Pool service | `pool_cleaning` 9,992, `pool_and_hot_tub_service` 5,630 |
+| 2 | Foundation repair | `foundation_repair` 1,250 |
+| 2 | Mold / water damage | none of its own; `damage_restoration` and `fire_and_water_damage_restoration` are already in roofing_restoration |
+| 2 | Insurance agencies | `insurance_agency` 235,471, `auto_insurance` 29,268, `life_insurance` 7,767, `home_and_rental_insurance` 6,557 |
+| 2 | Mortgage brokers | `mortgage_broker` 46,111 (`mortgage_lender` 37,444: review) |
+| 2 | Accountants / tax | `accountant` 91,895, `tax_service` 35,003, `bookkeeper` 3,448 |
+| 2 | Med spas | `medical_spa` 31,747 |
+| 2 | Salons / barbers | `hair_salon` 182,429, `beauty_salon` 212,412, `barber` 86,643, `nail_salon` 91,649 |
+| 2 | Property management | `property_management` 56,076 |
+| 2 | Real estate agencies | `real_estate_agent` 411,893 (`real_estate_service` 235,861: review) |
+| 3 | Movers | `mover` 14,374 |
+| 3 | Cleaning / maid | `home_cleaning` 35,058, `cleaning_service` 12,218, `janitorial_service` 9,174, `office_cleaning` 4,565 |
+| 3 | Carpet cleaning | `carpet_cleaning` 12,147 |
+| 3 | Solar installers | `solar_installation` 3,517 |
+| 3 | Fencing / concrete | `fence_and_gate_sales_service` 7,734, `masonry_concrete` 16,730 |
+| 3 | Painters | `painting` 20,313 |
+| 3 | Flooring | `flooring_contractor` 8,176, `carpet_installation` 783 |
+| 3 | Windows / doors | `windows_installation` 7,243, `door_sales_service` 4,183 |
+| 3 | Optometry | `optometry` 40,563, `vision_or_eye_care_clinic` 8,923 |
+| 3 | Dermatology | `dermatology` 16,411 |
+| 3 | Physical therapy | `physical_therapy` 58,605 |
+| 3 | Urgent care | `urgent_care_clinic` 5,070 |
+| 3 | Funeral homes | `funeral_service` 32,646 |
+| 3 | Driving schools | `driving_school` 10,511 |
+| 3 | Self-storage | `self_storage_facility` 58,149 |
+| 3 | Independent car dealers | `used_auto_dealer` 42,733 (`auto_dealer` 111,671: mostly franchised) |
+| 3 | Auto detailing | `auto_detailing` 33,597 |
+| 3 | Tire shops | `tire_shop` 19,589 (`tire_dealer_and_repair` is already in auto_repair) |
+
+Watch list (not configured): med spa/salon, property management, real estate agency (see 2b below).
 
 Each category file holds: value weight, Overture/OSM source codes, included/excluded subcategories, site
 pain keywords, review pain keywords, "already solved" negatives, chain/keyword exclusions, staff target,

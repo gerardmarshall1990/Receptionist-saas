@@ -410,7 +410,8 @@ def niche_report(
         raw_dir / "census_primary.parquet", raw_dir / "census_alternates.parquet"
     )
     con = duckdb.connect()
-    con.execute("create view b as select * from read_parquet(?)", [str(built)])
+    path = str(built).replace("'", "''")
+    con.execute(f"create view b as select * from read_parquet('{path}')")  # noqa: S608 (our own path)
     niches: list[tuple[str, str, list[str], str]] = []  # key, label, codes, sql filter
     for c in cats:
         cat = cfg.categories[c]
