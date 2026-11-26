@@ -395,3 +395,98 @@ def pilot_report(
         "",
     ]
     return "\n".join(L)
+
+
+def niche_report(
+    cfg: AppConfig,
+    built: Path,
+    cats: list[str],
+    subs: dict[str, set[str]],
+    raw_dir: Path,
+    per_niche: int,
+) -> str:
+    """Before any crawl: Overture codes per niche, kept/excluded counts, and kept rows per state."""
+    prim, _, _ = census_counts(
+        raw_dir / "census_primary.parquet", raw_dir / "census_alternates.parquet"
+    )
+    con = duckdb.connect()
+    con.execute("create view b as select * from read_parquet(?)", [str(built)])
+    niches: list[tuple[str, str, list[str], str]] = []  # key, label, codes, sql filter
+    for c in cats:
+        cat = cfg.categories[c]
+        if c in subs:
+            for sc in cat.subcategories:
+                if sc.slug in subs[c]:
+                    niches.append((f"{c}:{sc.slug}", f"{cat.label}: {sc.label}", sc.overture_codes,
+                                   f"category = '{c}' and subcategory = '{sc.slug}'"))  # fmt: skip
+        else:
+            niches.append((c, cat.label, list(cat.included_codes),
+                           f"category = '{c}' and subcategory in ({', '.join(repr(x) for x in set(cat.included_codes.values()))})"))  # fmt: skip
+    rows = []
+    for _key, label, codes, where in niches:
+        q = (
+            "select count(*), count(*) filter (where exclusion is null and dup_of is null),"  # noqa: S608
+            " count(*) filter (where exclusion is null and dup_of is null and domain is not null),"
+            " count(*) filter (where exclusion is null and dup_of is null and phone is not null),"
+            " count(*) filter (where exclusion like 'chain%' or exclusion = 'brand_wikidata'),"
+            f" count(*) filter (where dup_of is not null) from b where {where}"
+        )
+        raw, kept, web, ph, chain, dup = con.execute(q).fetchone() or (0, 0, 0, 0, 0, 0)
+        census = ", ".join(f"`{x}` {prim.get(x, 0):,}" for x in codes)
+        rows.append([label, census, f"{raw:,}", f"{kept:,}", f"{web:,} ({_pct(web, kept)})",
+                     f"{ph:,} ({_pct(ph, kept)})", f"{chain:,}", f"{dup:,}", f"{min(kept, per_niche):,}"])  # fmt: skip
+    states = [
+        r[0]
+        for r in con.execute(
+            "select state from b where exclusion is null and dup_of is null and state is not null"
+            " group by 1 order by 1"
+        ).fetchall()
+    ]
+    grid: dict[str, dict[str, int]] = {}
+    for key, _, _, where in niches:
+        for st, n in con.execute(
+            f"select state, count(*) from b where {where} and exclusion is null and dup_of is null"  # noqa: S608
+            " and state is not null group by 1"
+        ).fetchall():
+            grid.setdefault(st, {})[key] = n
+    keys = [k for k, *_ in niches]
+    state_rows = [[st, *[f"{grid.get(st, {}).get(k, 0):,}" for k in keys],
+                   f"{sum(grid.get(st, {}).values()):,}"] for st in states]  # fmt: skip
+    totals = ["**Total**", *[f"**{sum(grid.get(st, {}).get(k, 0) for st in states):,}**" for k in keys],
+              f"**{sum(sum(v.values()) for v in grid.values()):,}**"]  # fmt: skip
+    short = [k.split(":")[-1] for k in keys]
+    return "\n".join(
+        [
+            f"# Tier 1 niche universe (US), Overture {cfg.global_.overture_release}",
+            "",
+            f"Generated {datetime.now(UTC):%Y-%m-%d %H:%M} UTC by `leads universe niches`, from `{built.name}`.",
+            "No crawl, no paid API: open data only. *Kept* = not excluded (closed, chain/franchise, brand,",
+            "institution, keyword, lead-gen listing) and not a duplicate. *Pilot* = rows the additive load",
+            f"would take per niche (up to {per_niche:,}, stable random order, minus anything already in the database).",
+            "",
+            "## Codes matched and counts per niche",
+            "",
+            _table(
+                [
+                    "Niche",
+                    "Overture codes (census, primary)",
+                    "Raw",
+                    "Kept",
+                    "Kept with website",
+                    "Kept with usable phone",
+                    "Chains excluded",
+                    "Duplicates",
+                    "Pilot",
+                ],
+                rows,
+            ),
+            "",
+            "Already covered by existing categories (no new rows): orthodontics (dental), water heater",
+            "installation (plumbing), drain cleaning (no Overture code; sits under plumbing).",
+            "",
+            "## Kept rows per state",
+            "",
+            _table(["State", *short, "All"], [*state_rows, totals]),
+            "",
+        ]
+    )

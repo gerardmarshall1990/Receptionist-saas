@@ -1,0 +1,107 @@
+# Veterinary clinics. Tier 1 niche pilot (2026-11). Hypotheses until outcomes re-rank them.
+slug: veterinary
+label: Veterinary clinics
+rank: 14
+pilot_phase: null
+niche_knowledge_slug: null
+value_weight: 0.75
+why_converts:
+  - "Front desks are swamped with check-ins, refills and worried owners; calls ring out."
+  - "A sick pet's owner calls the next clinic if nobody answers."
+  - "A new client is worth thousands over a pet's lifetime."
+
+source_codes:
+  status: confirmed
+  overture_release: "2026-11-18.0"
+  osm: ["amenity=veterinary"]
+  note: "Census 2026-11-18.0: veterinarian 48,707 + animal_hospital 1,245 + veterinary_care 265 US places (primary)."
+
+subcategories:
+  - slug: veterinarian
+    label: "Veterinary clinic"
+    include: true
+    overture_codes: [veterinarian, veterinary_care]
+  - slug: animal_hospital
+    label: "Animal hospital"
+    include: true
+    overture_codes: [animal_hospital]
+
+pain_keywords:
+  - accepting new patients
+  - new clients welcome
+  - call to schedule
+  - call our office
+  - leave a message
+  - we'll call you back
+  - closed for lunch
+  - emergency appointments
+
+review_pain_keywords:
+  - never answers
+  - went to voicemail
+  - voicemail
+  - couldn't get through
+  - on hold
+  - never called back
+  - hard to reach
+
+negative_keywords:
+  - our call center
+  - client care center
+
+exclusions:
+  chain_name_patterns:
+    - banfield
+    - vca
+    - bluepearl
+    - thrive pet healthcare
+    - vetco
+    - petco
+    - petsmart
+    - medvet
+    - veterinary emergency group
+    - heart + paw
+    - bond vet
+    - modern animal
+  chain_name_contains:
+    - university of
+    - school of veterinary
+    - college of veterinary
+    - humane society
+    - spca
+    - animal control
+  keywords:
+    - animal shelter
+    - veterinary teaching hospital
+    - pet supply
+  note: "Seed list; corporate groups (Mars/VCA/NVA) often keep local names, so the domain rule matters most here."
+
+staff_target: {min: 3, typical: 10, max: 20, hard_max: 60}
+
+best_call_windows:
+  - days: [tue, wed, thu]
+    start: "10:30"
+    end: "11:45"
+    why: "After morning drop-offs and surgeries start."
+  - days: [tue, wed, thu]
+    start: "14:00"
+    end: "15:30"
+    why: "Mid-afternoon lull."
+
+opener_templates:
+  - id: lunch_closure
+    requires_signal: limited_hours_text
+    template: "I noticed {name} is closed {evidence}, which is when a lot of pet owners call to book."
+  - id: leave_a_message
+    requires_signal: leave_message_text
+    template: "Your site asks clients to leave a message, and a worried pet owner usually calls the next clinic instead."
+  - id: phone_only
+    requires_signal: phone_only_booking
+    template: "It looks like clients can only book {name} by phone, so every call during a busy check-in is at risk."
+  - id: hiring_front_desk
+    requires_signal: hiring_receptionist
+    template: "I noticed {name} is hiring for the front desk, and we can answer every call starting this week while you hire."
+
+open_questions:
+  - "Larger staff (often 10-30) than the 1-20 ICP: is the buyer the practice manager?"
+  - "Emergency-only hospitals already staff phones 24/7; should they be excluded?"

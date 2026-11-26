@@ -167,11 +167,28 @@ def _export_prune(args: argparse.Namespace) -> int:
     return 0
 
 
+def _export_merge(args: argparse.Namespace) -> int:
+    from leads_engine.compliance.export import merge_export
+
+    s = get_settings()
+    cfg = load_config(s.config_dir)
+    bases = sorted((s.data_dir / "exports").glob(f"*-{args.base}*"))
+    if len(bases) != 1:
+        raise SystemExit(f"--base {args.base!r} must match exactly one export folder, got {bases}")
+    res = merge_export(
+        s.database_url, cfg, base=bases[0], batch=args.batch, out_root=s.data_dir / "exports"
+    )
+    print(f"merge {res.export_id}: {res.counts}")
+    print(f"files: {res.path}")
+    return 0
+
+
 COMMANDS: dict[tuple[str, str], Callable[[argparse.Namespace], int]] = {
     ("compliance", "check"): _compliance_check,
     ("export", "run"): _export_run,
     ("export", "list"): _export_list,
     ("export", "prune"): _export_prune,
+    ("export", "merge"): _export_merge,
     ("suppress", "add"): _suppress_add,
     ("suppress", "import"): _suppress_import,
 }
@@ -193,6 +210,9 @@ def add_parser(groups: Any) -> None:
     ep.add_parser("list", help="recent exports")
     pr = ep.add_parser("prune", help="drop items and files of old CLI exports (headers kept)")
     pr.add_argument("--keep", type=int, default=3, help="newest CLI exports to keep whole")
+    mg = ep.add_parser("merge", help="base export rows as-is + a niche batch's gated rows")
+    mg.add_argument("--base", required=True, help="base export id prefix (e.g. abee15fb)")
+    mg.add_argument("--batch", required=True, help="niche_batch to add (e.g. tier1-pilot)")
     sp = groups.add_parser("suppress", help="permanent suppression list").add_subparsers(
         dest="command", required=True
     )

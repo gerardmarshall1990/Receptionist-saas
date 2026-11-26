@@ -1,6 +1,6 @@
 # Scoring rules (spec section 5). These are STARTING GUESSES; Stage 8 refits
 # them from outcomes. Bump `version` on any change.
-version: 3
+version: 4
 
 # Total = 0.35*pain + 0.25*value + 0.25*reachability + 0.15*fit (each 0-100).
 weights:
@@ -44,6 +44,7 @@ signal_weights:
   # value (added to category value_weight x value_base_scale)
   pricing_hints: 10
   multiple_locations: 15
+  new_patients_welcome: 0    # v16; weight stays 0 until it grades >= 90% precise (tier1 pilot)
   # fit
   website_works: 0           # handled by fit bases below
   owner_operated: 25

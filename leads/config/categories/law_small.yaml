@@ -1,6 +1,6 @@
 # Small law firms: personal injury, family, criminal defense. Spec rank 6.
 slug: law_small
-label: Small law firms (PI, family, criminal defense)
+label: Small law firms (PI, family, criminal, immigration, estate, bankruptcy)
 rank: 6
 pilot_phase: null
 niche_knowledge_slug: null
@@ -36,18 +36,23 @@ subcategories:
     reason: "Kept until the website shows the practice area; non-target areas are dropped in Stage 2."
   - slug: immigration
     label: "Immigration"
-    include: false
+    include: true
     overture_codes: [immigration_law]
-    reason: "Not in spec; OPEN QUESTION."
+    reason: "Tier 1 niche pilot (2026-11): approved by the owner."
   - slug: estate_planning
     label: "Estate/wills/probate"
-    include: false
+    include: true
     overture_codes: [wills_trusts_and_probate, estate_planning_law]
-    reason: "Not in spec; OPEN QUESTION."
+    reason: "Tier 1 niche pilot (2026-11): approved by the owner."
+  - slug: bankruptcy
+    label: "Bankruptcy"
+    include: true
+    overture_codes: [bankruptcy_law]
+    reason: "Tier 1 niche pilot (2026-11): approved by the owner."
   - slug: other_practice
     label: "Other practice areas"
     include: false
-    overture_codes: [bankruptcy_law, employment_law, business_law, real_estate_law, general_litigation, tax_law, medical_law, disability_law, social_security_law, ip_and_internet_law, patent_law, workers_compensation_law, contract_law, tenant_and_eviction_law, civil_rights_lawyer]
+    overture_codes: [employment_law, business_law, real_estate_law, general_litigation, tax_law, medical_law, disability_law, social_security_law, ip_and_internet_law, patent_law, workers_compensation_law, contract_law, tenant_and_eviction_law, civil_rights_lawyer]
     reason: "Not in spec."
   - slug: not_a_law_firm
     label: "Legal-adjacent services"

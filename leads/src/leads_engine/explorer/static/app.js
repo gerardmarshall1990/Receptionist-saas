@@ -55,7 +55,7 @@ function readUrl() {
   s.q = p.get("q") || "";
   s.callable_now = p.get("callable_now") === "true";
   s.include_suppressed = p.get("include_suppressed") === "true";
-  s.compliance = ["pass", "blocked"].includes(p.get("compliance")) ? p.get("compliance") : "";
+  s.compliance = ["pass", "blocked", "pending"].includes(p.get("compliance")) ? p.get("compliance") : "";
   s.sort = p.get("sort") || "score";
   s.lead = p.get("lead") || "";
   return s;
@@ -195,7 +195,7 @@ function renderFilters() {
 
   $("#f-compliance").replaceChildren(el("div", { class: "tri" }, el("span", {}, "Export gate"),
     el("span", { class: "seg", role: "group", "aria-label": "Export gate" },
-      ...[["", "Any"], ["pass", "Passes"], ["blocked", "Blocked"]].map(([v, t]) =>
+      ...[["", "Any"], ["pass", "Passes"], ["pending", "Pending"], ["blocked", "Blocked"]].map(([v, t]) =>
         el("button", { type: "button", "aria-pressed": String(state.compliance === v),
           onclick: () => { state.compliance = v; refresh(); } }, t)))));
 
@@ -221,7 +221,7 @@ function renderActive() {
       `${state[k] === "yes" ? "Has" : "No"} ${label.toLowerCase()}`));
   }
   if (state.callable_now) chips.push(el("button", { type: "button", class: "chip", onclick: () => { state.callable_now = false; refresh(); } }, "Callable now"));
-  if (state.compliance) chips.push(el("button", { type: "button", class: "chip", onclick: () => { state.compliance = ""; refresh(); } }, state.compliance === "pass" ? "Passes export gate" : "Blocked by gate"));
+  if (state.compliance) chips.push(el("button", { type: "button", class: "chip", onclick: () => { state.compliance = ""; refresh(); } }, state.compliance === "pass" ? "Passes export gate" : state.compliance === "pending" ? "Gate pending (new niche)" : "Blocked by gate"));
   if (state.q.trim()) chips.push(el("button", { type: "button", class: "chip", onclick: () => { state.q = ""; refresh(); } }, `“${state.q.trim()}”`));
   $("#active").replaceChildren(...chips);
 }
@@ -386,10 +386,12 @@ function blockLabel(b) {
 
 function complianceSection(c) {
   if (!c) return section("Export gate", el("p", { class: "muted small" }, "Not scored yet, so not exportable."));
-  const pass = c.status === "pass";
+  const pending = c.status === "pending";
+  const pass = c.status === "pass" || pending;
   return section("Export gate",
     el("div", { class: "scoreline" },
-      el("span", { class: `pill ${pass ? "pill-good" : "pill-bad"}` }, pass ? "passes: exportable" : "blocked"),
+      el("span", { class: `pill ${pending ? "pill-warn" : pass ? "pill-good" : "pill-bad"}` },
+        pending ? "pending: DNC, line type and country rules not checked yet" : pass ? "passes: exportable" : "blocked"),
       META.export.calling_mode === "human" ? el("span", { class: "muted small" }, "for human-dialled calls") : null),
     c.blocks.length ? el("ul", { class: "facts" }, c.blocks.map((b) => el("li", {}, el("span", { class: "pill pill-bad" }, "block"), el("span", {}, blockLabel(b))))) : null,
     c.warnings.length ? el("ul", { class: "facts" }, c.warnings.map((w) => el("li", {}, el("span", { class: "pill pill-warn" }, "note"), el("span", {}, blockLabel(w))))) : null,

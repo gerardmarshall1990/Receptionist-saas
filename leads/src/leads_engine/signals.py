@@ -69,6 +69,11 @@ _SIGNALS: tuple[Signal, ...] = (
     # Value
     Signal("pricing_hints", Dimension.VALUE, "Published prices or ticket sizes for services."),
     Signal(
+        "new_patients_welcome",
+        Dimension.VALUE,
+        "Practice says it is accepting new patients/clients (wants new-patient calls).",
+    ),
+    Signal(
         "multiple_locations",
         Dimension.VALUE,
         "More than one location (more value; check decision-maker).",

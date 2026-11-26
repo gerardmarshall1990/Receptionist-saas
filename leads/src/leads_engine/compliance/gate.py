@@ -30,13 +30,14 @@ class GateInput:
     email: str | None = None
     email_origin: str | None = None
     dnc_checked: bool = False
+    niche_batch: str | None = None
     # Suppression values as stored: {"business_id": {...}, "phone_e164": {...}, ...}
     suppression: dict[str, set[str]] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
 class GateResult:
-    status: str  # "pass" | "blocked"
+    status: str  # "pass" | "blocked" | "pending" (a pending batch that passed every check)
     blocks: tuple[str, ...]
     warnings: tuple[str, ...]
 
@@ -121,4 +122,9 @@ def evaluate(
     else:
         blocks += [f"license_not_allowed:{x}" for x in inp.licenses if x not in ex.allowed_licenses]
 
-    return GateResult("blocked" if blocks else "pass", tuple(blocks), tuple(warnings))
+    if blocks:
+        return GateResult("blocked", tuple(blocks), tuple(warnings))
+    # New niche batches stay pending until DNC, line type and country rules are checked for them.
+    if not control and inp.niche_batch in ex.pending_batches:
+        return GateResult("pending", (), (*warnings, "pending:dnc_line_type_country_rules"))
+    return GateResult("pass", (), tuple(warnings))

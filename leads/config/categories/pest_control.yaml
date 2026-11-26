@@ -1,0 +1,96 @@
+# Pest control. Tier 1 niche pilot (2026-11). Hypotheses until outcomes re-rank them.
+slug: pest_control
+label: Pest control
+rank: 11
+pilot_phase: null
+niche_knowledge_slug: null
+value_weight: 0.65
+why_converts:
+  - "Someone who just found termites, bed bugs or a wasp nest books whoever answers first."
+  - "Technicians are in crawl spaces and attics; small operators miss calls all day."
+  - "A missed call is a lost recurring service plan worth hundreds a year."
+
+source_codes:
+  status: confirmed
+  overture_release: "2026-11-18.0"
+  osm: ["craft=pest_control"]
+  note: "Census 2026-11-18.0: pest_control_service 23,984 US places (primary)."
+
+subcategories:
+  - slug: pest_control
+    label: "Pest control"
+    include: true
+    overture_codes: [pest_control_service]
+
+pain_keywords:
+  - same day service
+  - emergency pest
+  - free inspection
+  - call for a free estimate
+  - call now
+  - leave a message
+  - we'll call you back
+
+review_pain_keywords:
+  - never answers
+  - went to voicemail
+  - voicemail
+  - couldn't get through
+  - never called back
+  - hard to reach
+
+negative_keywords:
+  - our customer care center
+  - call center open 24/7
+
+exclusions:
+  chain_name_patterns:
+    - orkin
+    - terminix
+    - rentokil
+    - aptive
+    - truly nolen
+    - arrow exterminators
+    - massey services
+    - abc home & commercial
+    - ehrlich
+    - western exterminator
+    - hawx
+    - mosquito joe
+    - mosquito squad
+    - mosquito authority
+  chain_name_contains:
+    - home depot
+  keywords:
+    - pest control supply
+    - wholesale
+  note: "Seed list from the largest US pest brands and franchises."
+
+staff_target: {min: 1, typical: 5, max: 20, hard_max: 50}
+
+best_call_windows:
+  - days: [mon, tue, wed, thu, fri]
+    start: "08:00"
+    end: "09:00"
+    why: "Before the first route."
+  - days: [mon, tue, wed, thu, fri]
+    start: "15:30"
+    end: "17:30"
+    why: "Back from routes."
+
+opener_templates:
+  - id: same_day
+    requires_signal: emergency_247_claim
+    template: "I saw {name} offers emergency or same-day service, so when a call comes in while your techs are in an attic, who answers it?"
+  - id: leave_a_message
+    requires_signal: leave_message_text
+    template: "Your site asks callers to leave a message, and someone who just found termites usually calls the next company instead."
+  - id: hiring_front_desk
+    requires_signal: hiring_receptionist
+    template: "I noticed {name} is hiring someone to answer phones, and we can cover every call starting this week while you look."
+  - id: phone_only
+    requires_signal: phone_only_booking
+    template: "It looks like the only way to book {name} is by phone, so every missed call is a lost service plan."
+
+open_questions:
+  - "Value weight 0.65 is a guess; recurring plans raise lifetime value."

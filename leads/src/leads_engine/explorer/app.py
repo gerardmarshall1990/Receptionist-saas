@@ -137,7 +137,7 @@ def create_app(
         has_email: Tri | None = None,
         callable_now: bool = False,
         include_suppressed: bool = False,
-        compliance: Literal["pass", "blocked"] | None = None,
+        compliance: Literal["pass", "blocked", "pending"] | None = None,
     ) -> qx.Filters:
         subs = {s.slug for c in cfg.categories.values() for s in c.subcategories}
         checks = (

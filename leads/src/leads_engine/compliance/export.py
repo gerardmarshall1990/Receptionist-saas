@@ -58,6 +58,7 @@ SCHEMA = pa.schema(
 CANDIDATES = """
 select b.id, b.name, b.category, b.country, b.state, b.city, b.tz, b.website, b.domain,
        b.flags, b.source, b.licenses, b.source_datasets, b.crawled_at, b.email_status,
+       b.niche_batch, b.subcategory,
        s.total, s.tier, s.dead_reason,
        p.e164, coalesce(p.status, 'none') as phone_status, coalesce(p.flags, '{{}}') as phone_flags,
        p.line_type, p.verified_at,
@@ -136,6 +137,7 @@ def gate_input(row: dict[str, Any], suppression: dict[str, set[str]]) -> GateInp
         domain=row["domain"],
         email=row["email"],
         email_origin=row["email_origin"],
+        niche_batch=row.get("niche_batch"),
         suppression=suppression,
     )
 
@@ -217,7 +219,7 @@ def gate_one(
             for mt, mv in sc:
                 supp.setdefault(mt, set()).add(mv)
     res = evaluate(gate_input(row, supp), cfg.compliance)
-    opener = contract_record(row, cfg)["opener"] if res.status == "pass" else None
+    opener = contract_record(row, cfg)["opener"] if res.status in ("pass", "pending") else None
     return {
         "status": res.status,
         "blocks": list(res.blocks),
@@ -423,7 +425,8 @@ def prune_exports(url: str, keep: int) -> dict[str, int]:
     (a person downloaded them) are never pruned; header rows and manifest.json always stay."""
     with psycopg.connect(url, row_factory=tuple_row) as conn:
         old = conn.execute(
-            "select id, path from exports where origin = 'cli' and pruned_at is null and id not in"
+            "select id, path from exports where origin = 'cli' and pruned_at is null"
+            " and not protected and id not in"
             " (select id from exports where origin = 'cli' order by created_at desc limit %s)",
             (max(keep, 1),),
         ).fetchall()
@@ -439,3 +442,143 @@ def prune_exports(url: str, keep: int) -> dict[str, int]:
                     files += 1
             conn.execute("update exports set pruned_at = now() where id = %s", (export_id,))
     return {"exports": len(old), "items": items, "files": files}
+
+
+# ---------------------------------------------------------------- merge
+
+MERGE_FIELDS: tuple[str, ...] = (*CONTRACT_FIELDS, "niche_batch", "subcategory")
+MERGE_SCHEMA = pa.schema(
+    [*SCHEMA, pa.field("niche_batch", pa.string()), pa.field("subcategory", pa.string())]
+)
+BASE_BATCH = "core-7"
+
+
+@dataclass
+class MergeResult:
+    export_id: str
+    path: Path
+    counts: dict[str, int]
+
+
+def merge_export(
+    url: str, cfg: AppConfig, *, base: Path, batch: str, out_root: Path, run_id: str | None = None
+) -> MergeResult:
+    """One file in the export contract (+ `niche_batch`, `subcategory`): the base export's rows
+    exactly as exported, plus the batch's gated rows. Batch rows are `pending` (never `pass`)
+    while the batch is in compliance `pending_batches`. Suppression is re-read at write time and
+    always wins, for base rows too."""
+    base_manifest = json.loads((base / "manifest.json").read_text())
+    base_rows = pq.read_table(base / "leads.parquet").to_pylist()
+    if any(r["compliance_status"] != "pass" for r in base_rows):
+        raise ValueError("base export holds rows that are not 'pass'")
+    tiers = tiers_at_or_above(cfg.compliance.export.min_tier)
+    counts: Counter[str] = Counter()
+    blocked_by: Counter[str] = Counter()
+    batch_items: list[tuple[str, GateResult, dict[str, Any] | None]] = []
+    attributions: set[str] = set()
+    with psycopg.connect(url) as rconn, psycopg.connect(url) as conn:
+        supp = load_suppression(conn)
+        cur = _stream(
+            rconn,
+            sql.SQL("b.niche_batch = %s and s.tier = any(%s)"),
+            [batch, tiers],
+            " order by s.total desc, b.id",
+        )
+        for row in cur:
+            res = evaluate(gate_input(row, supp), cfg.compliance)
+            rec = None
+            if res.status in ("pass", "pending"):
+                rec = {**contract_record(row, cfg), "compliance_status": res.status,
+                       "niche_batch": batch, "subcategory": row["subcategory"]}  # fmt: skip
+                attributions.update(row["source_datasets"] or ())
+            for b in res.blocks:
+                blocked_by[b] += 1
+            counts[f"batch_{res.status}"] += 1
+            batch_items.append((str(row["id"]), res, rec))
+        cur.close()
+
+        export_id = str(uuid.uuid4())
+        with conn.transaction():
+            fresh = load_suppression(conn)
+
+            def suppressed(r: dict[str, Any]) -> bool:
+                return bool(suppression_hits(GateInput(
+                    business_id=r["business_id"], country=r["country"], tier=r["tier"],
+                    dead_reason=None, phone_e164=r["phone_e164"], phone_status=r["phone_status"],
+                    phone_flags=(), line_type=r["line_type"], business_flags=(), source=r["source"],
+                    licenses=(), n_reasons=0, domain=None, email=r["email"], suppression=fresh,
+                )))  # fmt: skip
+
+            records: list[dict[str, Any]] = []
+            for r in base_rows:
+                if suppressed(r):
+                    counts["base_dropped_suppressed"] += 1
+                    continue
+                records.append({**r, "niche_batch": BASE_BATCH, "subcategory": None})
+                counts["base_rows"] += 1
+            final: list[tuple[str, GateResult, dict[str, Any] | None]] = []
+            for bid, res, rec in batch_items:
+                if rec is not None and suppressed(rec):
+                    res, rec = GateResult("blocked", ("suppressed",), res.warnings), None
+                    counts["batch_dropped_suppressed"] += 1
+                if rec is not None:
+                    records.append(rec)
+                    counts["batch_rows"] += 1
+                final.append((bid, res, rec))
+            counts["total_rows"] = len(records)
+
+            stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
+            out = out_root / f"{stamp}-{export_id[:8]}"
+            out.mkdir(parents=True, exist_ok=False)
+            pq.write_table(
+                pa.Table.from_pylist(records, schema=MERGE_SCHEMA), out / "leads.parquet"
+            )
+            buf = io.StringIO()
+            w = csv.DictWriter(buf, fieldnames=list(MERGE_FIELDS), lineterminator="\n")
+            w.writeheader()
+            for r in records:
+                w.writerow(
+                    {k: json.dumps(r[k]) if k == "why_reasons" else r[k] for k in MERGE_FIELDS}
+                )
+            (out / "leads.csv").write_text(buf.getvalue(), encoding="utf-8")
+            manifest = {
+                "export_id": export_id,
+                "created_at": datetime.now(UTC).isoformat(),
+                "kind": "merge",
+                "base_export_id": base_manifest["export_id"],
+                "batch": batch,
+                "contract": list(MERGE_FIELDS),
+                "counts": dict(counts),
+                "blocked_by": dict(blocked_by),
+                "config_hash": cfg.config_hash,
+                "compliance_version": cfg.compliance.version,
+                "calling_mode": cfg.compliance.calling_mode,
+                "pending_means": "passed every current gate check; DNC, line type and country rules"
+                " not checked yet for this batch. Not cleared for calling.",
+                "needs_counsel": cfg.compliance.needs_counsel,
+                "attribution": base_manifest["attribution"]
+                + (
+                    f" Batch {batch} datasets: {', '.join(sorted(attributions))}."
+                    if attributions
+                    else ""
+                ),
+            }
+            (out / "manifest.json").write_text(json.dumps(manifest, indent=2, default=str))
+            conn.execute(
+                "insert into exports (id, run_id, origin, params, config_hash, compliance_version,"
+                " n_candidates, n_passed, n_blocked, path, protected)"
+                " values (%s,%s,'cli',%s,%s,%s,%s,%s,%s,%s,true)",
+                (export_id, run_id, json.dumps({"merge": True, "base": base_manifest["export_id"],
+                 "batch": batch}), cfg.config_hash, cfg.compliance.version, len(batch_items),
+                 counts["base_rows"], counts["batch_blocked"], str(out)),
+            )  # fmt: skip
+            conn.execute(
+                "update exports set protected = true where id = %s", (base_manifest["export_id"],)
+            )
+            with conn.cursor().copy(
+                "copy export_items (export_id, business_id, status, blocks, warnings, row) from stdin"
+            ) as cp:
+                for bid, res, rec in final:
+                    cp.write_row([export_id, bid, res.status, list(res.blocks), list(res.warnings),
+                                  json.dumps(rec) if rec else None])  # fmt: skip
+    return MergeResult(export_id, out, dict(counts))

@@ -1,0 +1,92 @@
+# Chiropractic clinics. Tier 1 niche pilot (2026-11). Hypotheses until outcomes re-rank them.
+slug: chiropractic
+label: Chiropractic clinics
+rank: 13
+pilot_phase: null
+niche_knowledge_slug: null
+value_weight: 0.70
+why_converts:
+  - "New-patient calls are missed while the doctor is adjusting and the front desk checks people in."
+  - "A new patient on a care plan is worth $1,000+ over the plan."
+  - "Many clinics are one doctor and one assistant: nobody answers during treatment."
+
+source_codes:
+  status: confirmed
+  overture_release: "2026-11-18.0"
+  osm: ["healthcare=chiropractor", "healthcare:speciality=chiropractic"]
+  note: "Census 2026-11-18.0: chiropractic 82,115 US places (primary)."
+
+subcategories:
+  - slug: chiropractic
+    label: "Chiropractic"
+    include: true
+    overture_codes: [chiropractic]
+
+pain_keywords:
+  - new patients welcome
+  - accepting new patients
+  - new patient special
+  - call to schedule
+  - call our office
+  - leave a message
+  - we'll call you back
+  - closed for lunch
+
+review_pain_keywords:
+  - never answers
+  - went to voicemail
+  - voicemail
+  - couldn't get through
+  - on hold
+  - never called back
+  - hard to reach
+
+negative_keywords:
+  - our call center
+  - patient call center
+
+exclusions:
+  chain_name_patterns:
+    - the joint chiropractic
+    - healthsource
+    - 100% chiropractic
+    - align wellness center
+  chain_name_contains:
+    - hospital
+    - health system
+  keywords:
+    - chiropractic college
+    - university of
+    - school of chiropractic
+    - hospital
+  note: "Seed list from the largest US chiropractic franchises."
+
+staff_target: {min: 1, typical: 4, max: 15, hard_max: 40}
+
+best_call_windows:
+  - days: [tue, wed, thu]
+    start: "10:30"
+    end: "12:00"
+    why: "After the morning adjustment rush."
+  - days: [tue, wed, thu]
+    start: "13:30"
+    end: "15:00"
+    why: "Many clinics have a mid-day gap."
+
+opener_templates:
+  - id: lunch_closure
+    requires_signal: limited_hours_text
+    template: "I noticed {name} is closed {evidence}, which is when a lot of new patients call to book."
+  - id: leave_a_message
+    requires_signal: leave_message_text
+    template: "Your site asks patients to leave a message, and new patients usually call the next clinic rather than wait."
+  - id: phone_only
+    requires_signal: phone_only_booking
+    template: "It looks like new patients can only book {name} by phone, so every call during an adjustment is at risk."
+  - id: hiring_front_desk
+    requires_signal: hiring_receptionist
+    template: "I noticed {name} is hiring for the front desk, and we can answer every call starting this week while you hire."
+
+open_questions:
+  - "HIPAA: an AI receptionist taking patient details needs a BAA (same as dental). Is the product ready?"
+  - "Value weight 0.70 is a guess."

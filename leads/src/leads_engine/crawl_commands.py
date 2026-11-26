@@ -46,7 +46,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         run.counts = asyncio.run(
             runner.run(s.database_url, cfg.crawl, s.data_dir, max_sites=args.max_sites,
                        time_limit_s=args.minutes * 60, run_id=run.id,
-                       signatures=all_signatures(cfg))
+                       signatures=all_signatures(cfg), niche_batch=args.batch)
         )  # fmt: skip
     print(f"crawl: {run.counts}")
     return 0
@@ -129,6 +129,9 @@ def add_parser(groups: Any) -> None:
     r.add_argument("--max-sites", type=int, default=1000)
     r.add_argument("--minutes", type=float, default=120)
     r.add_argument("--dry-run", action="store_true")
+    r.add_argument(
+        "--batch", help="only sites of businesses in this niche_batch (e.g. tier1-pilot)"
+    )
     ex = c.add_parser(
         "extract", help="signals/emails/phones from saved pages (no network; incremental)"
     )

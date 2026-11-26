@@ -15,7 +15,7 @@ from leads_engine.runs import recorded_run
 from leads_engine.settings import PROJECT_ROOT, Settings, get_settings
 from leads_engine.universe import pipeline
 from leads_engine.universe import report as rpt
-from leads_engine.universe.load import load, sample_rows
+from leads_engine.universe.load import load, load_additive, sample_rows
 
 REPORTS_DIR = PROJECT_ROOT / "docs" / "reports"
 
@@ -109,10 +109,45 @@ def cmd_load(args: argparse.Namespace) -> int:
     built = paths.built(cats, cfg.config_hash)
     if not built.exists():
         raise FileNotFoundError(f"built file missing, run `leads universe build`: {built}")
+    if args.add:
+        if not args.batch:
+            raise ValueError("--add needs --batch (the niche_batch label for the new rows)")
+        subs = _subcategories(args.subcategories)
+        params = {"built": str(built), "batch": args.batch, "per_niche": args.per_niche}
+        with _run(s, cfg, "stage1.load_additive", params) as run:
+            run.counts = load_additive(
+                s.database_url, built, args.batch, per_niche=args.per_niche,
+                seed=pipeline.SAMPLE_SEED, subcategories=subs, split=set(subs),
+            )  # fmt: skip
+        print(f"load (additive, batch {args.batch}): {run.counts}")
+        return 0
     scope: Literal["sample", "all"] = "all" if args.all else "sample"
     with _run(s, cfg, "stage1.load", {"built": str(built), "scope": scope}) as run:
         run.counts = load(s.database_url, built, scope)
     print(f"load: {run.counts}")
+    return 0
+
+
+def _subcategories(spec: str | None) -> dict[str, set[str]]:
+    """'law_small=immigration+estate_planning,other=x' -> {'law_small': {...}}."""
+    out: dict[str, set[str]] = {}
+    for part in (spec or "").split(","):
+        if part.strip():
+            cat, _, subs = part.partition("=")
+            out[cat.strip()] = {x.strip() for x in subs.split("+") if x.strip()}
+    return out
+
+
+def cmd_niches(args: argparse.Namespace) -> int:
+    """Codes matched per niche and kept rows per niche per state, before any crawl."""
+    _, cfg, paths, cats = _ctx(args)
+    built = paths.built(cats, cfg.config_hash)
+    if not built.exists():
+        raise FileNotFoundError(f"built file missing, run `leads universe build`: {built}")
+    subs = _subcategories(args.subcategories)
+    out = REPORTS_DIR / f"{args.name}-universe.md"
+    out.write_text(rpt.niche_report(cfg, built, cats, subs, paths.raw_dir, args.per_niche))
+    print(f"niche report -> {out}")
     return 0
 
 
@@ -159,6 +194,7 @@ COMMANDS: dict[tuple[str, str], Callable[[argparse.Namespace], int]] = {
     ("universe", "load"): cmd_load,
     ("universe", "report"): cmd_report,
     ("universe", "pilot"): cmd_pilot,
+    ("universe", "niches"): cmd_niches,
 }
 
 
@@ -174,6 +210,7 @@ def add_parser(groups: Any) -> None:
         "load": "upsert the pilot sample into Postgres",
         "report": "write docs/reports/stage1-pilot-<release>.md",
         "pilot": "census + extract + build + load + report",
+        "niches": "per-niche codes and kept rows per state (docs/reports/<name>-universe.md)",
     }
     for name, h in helps.items():
         sp = u.add_parser(name, help=h)
@@ -185,3 +222,15 @@ def add_parser(groups: Any) -> None:
         sp.add_argument(
             "--all", action="store_true", help="load: every kept business, not just the sample"
         )
+        sp.add_argument(
+            "--add",
+            action="store_true",
+            help="load: additive niche batch (never deletes, flags or updates existing rows)",
+        )
+        sp.add_argument("--batch", help="load --add: niche_batch label, e.g. tier1-pilot")
+        sp.add_argument("--per-niche", type=int, default=5000, help="rows per niche (load --add)")
+        sp.add_argument(
+            "--subcategories",
+            help="only these subcategories, split into niches: law_small=immigration+bankruptcy",
+        )
+        sp.add_argument("--name", default="tier1", help="niches: report name")

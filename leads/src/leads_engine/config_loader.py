@@ -498,6 +498,9 @@ class ExportRules(Strict):
     allowed_licenses: list[str]
     blocked_phone_flags: list[str]
     blocked_business_flags: list[str]
+    # Niche batches whose leads are "pending", never "pass", until DNC / line type / country
+    # rules are checked for them.
+    pending_batches: list[str] = []
 
     @model_validator(mode="after")
     def _reasons(self) -> Self:

@@ -17,6 +17,7 @@ from typing import Any, Literal
 import duckdb
 import psycopg
 
+from leads_engine.universe.build import sample_key
 from leads_engine.universe.overture import LICENSE_NOTE
 
 Scope = Literal["sample", "all"]
@@ -111,40 +112,46 @@ def _merge_sql() -> str:
     return _MERGE.format(cols=cols, updates=updates)
 
 
+def _stage(cur: psycopg.Cursor[Any], rows: list[dict[str, Any]], counts: dict[str, int]) -> None:
+    """COPY rows (and their phones/emails) into the temp staging tables."""
+    cur.execute(_STAGE_DDL)
+    with cur.copy(f"copy stage_b ({', '.join(_BUSINESS_COLS)}) from stdin") as cp:
+        for r in rows:
+            v = {c: r.get(c) for c in _BUSINESS_COLS}
+            v["source_confidence"] = r["confidence"]
+            v["attribution"] = attribution(r["source_release"], r["source_datasets"])
+            v["in_pilot_sample"] = bool(r["in_sample"])
+            cp.write_row([v[c] for c in _BUSINESS_COLS])
+    with cur.copy("copy stage_p from stdin") as cp:
+        for r in rows:
+            for p in r["phones"]:
+                if p["e164"]:  # unparseable/invalid numbers stay in Parquet only
+                    cp.write_row(
+                        [r["source_id"], p["e164"], p["valid"], p["number_type"], p["flags"]]
+                    )
+                    counts["phones"] += 1
+    with cur.copy("copy stage_e from stdin") as cp:
+        for r in rows:
+            for e in r["emails"]:
+                cp.write_row(
+                    [r["source_id"], e["email"], e["syntax_ok"], e["is_role_based"],
+                     e["is_freemail"], e["domain_matches_site"], e["flags"]]
+                )  # fmt: skip
+                counts["emails"] += 1
+
+
 def load(url: str, built: Path, scope: Scope = "sample") -> dict[str, int]:
     rows = kept_rows(built, scope)
     if any(not r["licenses"] for r in rows):
         raise ValueError("refusing to load rows without a source license")
     counts = {"businesses": len(rows), "phones": 0, "emails": 0}
     with psycopg.connect(url) as conn, conn.transaction(), conn.cursor() as cur:
-        cur.execute(_STAGE_DDL)
-        with cur.copy(f"copy stage_b ({', '.join(_BUSINESS_COLS)}) from stdin") as cp:
-            for r in rows:
-                v = {c: r.get(c) for c in _BUSINESS_COLS}
-                v["source_confidence"] = r["confidence"]
-                v["attribution"] = attribution(r["source_release"], r["source_datasets"])
-                v["in_pilot_sample"] = bool(r["in_sample"])
-                cp.write_row([v[c] for c in _BUSINESS_COLS])
-        with cur.copy("copy stage_p from stdin") as cp:
-            for r in rows:
-                for p in r["phones"]:
-                    if p["e164"]:  # unparseable/invalid numbers stay in Parquet only
-                        cp.write_row(
-                            [r["source_id"], p["e164"], p["valid"], p["number_type"], p["flags"]]
-                        )
-                        counts["phones"] += 1
-        with cur.copy("copy stage_e from stdin") as cp:
-            for r in rows:
-                for e in r["emails"]:
-                    cp.write_row(
-                        [r["source_id"], e["email"], e["syntax_ok"], e["is_role_based"],
-                         e["is_freemail"], e["domain_matches_site"], e["flags"]]
-                    )  # fmt: skip
-                    counts["emails"] += 1
+        _stage(cur, rows, counts)
         # Mirror the scope: drop rows that left it, unless a later stage touched them
         # (crawled, or referenced by an experiment, call outcome, export or suppression).
         cur.execute(
             "delete from businesses b where b.source = 'overture' and b.crawled_at is null"
+            " and b.niche_batch is null"
             " and not exists (select 1 from stage_b s where s.source_id = b.source_id)"
             " and not exists (select 1 from experiment_assignments a where a.business_id = b.id)"
             " and not exists (select 1 from outcomes o where o.business_id = b.id)"
@@ -157,6 +164,7 @@ def load(url: str, built: Path, scope: Scope = "sample") -> dict[str, int]:
         cur.execute(
             "update businesses b set flags = array_append(b.flags, 'not_in_latest_build')"
             " where b.source = 'overture' and not ('not_in_latest_build' = any(b.flags))"
+            " and b.niche_batch is null"
             " and not exists (select 1 from stage_b s where s.source_id = b.source_id)"
         )
         counts["kept_not_in_latest_build"] = cur.rowcount
@@ -171,6 +179,120 @@ def load(url: str, built: Path, scope: Scope = "sample") -> dict[str, int]:
             "update businesses b set flags = array_remove(b.flags, 'not_in_latest_build')"
             " where 'not_in_latest_build' = any(b.flags)"
             " and exists (select 1 from stage_b s where s.source_id = b.source_id)"
+        )
+    with psycopg.connect(url, autocommit=True) as conn:
+        conn.execute("analyze businesses; analyze phones; analyze emails")
+    return counts
+
+
+def additive_rows(
+    built: Path,
+    existing: tuple[set[str], set[str], set[str]],
+    *,
+    per_niche: int,
+    seed: str,
+    subcategories: dict[str, set[str]] | None = None,
+    split: set[str] = frozenset(),  # type: ignore[assignment]
+) -> tuple[list[dict[str, Any]], dict[str, int]]:
+    """The pilot sample for an additive load: kept rows of the built file, minus rows already in
+    the database (same source id) or duplicating an existing business (same website domain or
+    phone), at most `per_niche` per niche (category, or category:subcategory for `split`),
+    in the same stable hash order as the Stage 1 sample."""
+    source_ids, domains, phones = existing
+    skipped: dict[str, int] = {"already_loaded": 0, "dup_of_existing": 0, "other_subcategory": 0}
+    by_niche: dict[str, list[dict[str, Any]]] = {}
+    for r in kept_rows(built, "all"):
+        allowed = (subcategories or {}).get(r["category"])
+        if allowed is not None and r["subcategory"] not in allowed:
+            skipped["other_subcategory"] += 1
+            continue
+        loaded = r["source_id"] in source_ids
+        if not loaded and (
+            (r["domain"] and r["domain"] in domains) or (r["phone"] and r["phone"] in phones)
+        ):
+            skipped["dup_of_existing"] += 1
+            continue
+        key = f"{r['category']}:{r['subcategory']}" if r["category"] in split else r["category"]
+        r["_loaded"] = loaded
+        by_niche.setdefault(key, []).append(r)
+    picked: list[dict[str, Any]] = []
+    for key in sorted(by_niche):
+        # The same stable sample on every run: re-running never tops the batch up.
+        top = sorted(by_niche[key], key=lambda r: sample_key(seed, r["source_id"]))[:per_niche]
+        rows = [r for r in top if not r["_loaded"]]
+        skipped["already_loaded"] += len(top) - len(rows)
+        for r in rows:
+            r["in_sample"] = True
+        picked += rows
+        skipped[f"available:{key}"] = len(by_niche[key])
+        skipped[f"picked:{key}"] = len(rows)
+    return picked, skipped
+
+
+def load_additive(
+    url: str,
+    built: Path,
+    batch: str,
+    *,
+    per_niche: int,
+    seed: str,
+    subcategories: dict[str, set[str]] | None = None,
+    split: set[str] = frozenset(),  # type: ignore[assignment]
+) -> dict[str, int]:
+    """Add a new niche batch WITHOUT touching anything already loaded: no deletes, no
+    `not_in_latest_build` flags, no updates to existing rows (conflicts are skipped)."""
+    with psycopg.connect(url) as conn:
+        ids = {r[0] for r in conn.execute("select source_id from businesses")}
+        doms = {
+            r[0] for r in conn.execute("select domain from businesses where domain is not null")
+        }
+        phs = {r[0] for r in conn.execute("select phone from businesses where phone is not null")}
+    rows, counts = additive_rows(
+        built, (ids, doms, phs), per_niche=per_niche, seed=seed,
+        subcategories=subcategories, split=split,
+    )  # fmt: skip
+    if any(not r["licenses"] for r in rows):
+        raise ValueError("refusing to load rows without a source license")
+    counts.update({"businesses": len(rows), "phones": 0, "emails": 0})
+    cols = ", ".join(_BUSINESS_COLS)
+    with psycopg.connect(url) as conn, conn.transaction(), conn.cursor() as cur:
+        _stage(cur, rows, counts)
+        cur.execute(
+            f"insert into businesses ({cols}, niche_batch) select {cols}, %s from stage_b"  # noqa: S608
+            " on conflict (source, source_id) do nothing",
+            (batch,),
+        )
+        counts["inserted"] = cur.rowcount
+        cur.execute(
+            "insert into phones (business_id, e164, sources, agree_count, valid_format,"
+            " number_type_guess, flags, status)"
+            " select distinct on (b.id, sp.e164) b.id, sp.e164, array['overture'], 1, sp.valid,"
+            " sp.number_type, sp.flags, case when sp.valid then 'unverified' else 'invalid' end"
+            " from stage_p sp join businesses b"
+            " on b.source = 'overture' and b.source_id = sp.source_id where b.niche_batch = %s"
+            " and not exists (select 1 from phones x where x.business_id = b.id)",
+            (batch,),
+        )
+        cur.execute(
+            "insert into emails (business_id, email, origin, syntax_ok, is_role_based, is_freemail,"
+            " domain_matches_site, flags)"
+            " select distinct on (b.id, se.email) b.id, se.email, 'source_listed', se.syntax_ok,"
+            " se.is_role_based, se.is_freemail, se.domain_matches_site, se.flags"
+            " from stage_e se join businesses b"
+            " on b.source = 'overture' and b.source_id = se.source_id where b.niche_batch = %s"
+            " and not exists (select 1 from emails x where x.business_id = b.id)",
+            (batch,),
+        )
+        cur.execute(
+            "update businesses b set phone_status = case when b.phone is null then 'none' else"
+            " coalesce((select p.status from phones p"
+            " where p.business_id = b.id and p.e164 = b.phone), 'none') end,"
+            " email_status = case when exists"
+            " (select 1 from emails e where e.business_id = b.id)"
+            " then 'source_listed' else 'none' end"
+            " from stage_b s where b.source = s.source and b.source_id = s.source_id"
+            " and b.niche_batch = %s and b.crawled_at is null",
+            (batch,),
         )
     with psycopg.connect(url, autocommit=True) as conn:
         conn.execute("analyze businesses; analyze phones; analyze emails")

@@ -1,0 +1,90 @@
+# Locksmiths. Tier 1 niche pilot (2026-11). Weights/windows are hypotheses until outcomes re-rank them.
+slug: locksmith
+label: Locksmiths
+rank: 8
+pilot_phase: null
+niche_knowledge_slug: null
+value_weight: 0.60
+why_converts:
+  - "Lockout callers ring the next locksmith within seconds if nobody answers."
+  - "Usually a one-person, on-the-road business: the phone is answered from a van, or not at all."
+  - "Night and weekend lockouts are the best-paying jobs and the most often missed."
+
+source_codes:
+  status: confirmed
+  overture_release: "2026-11-18.0"
+  osm: ["craft=locksmith", "shop=locksmith"]
+  note: "Census 2026-11-18.0: key_and_locksmith 34,969 US places (primary)."
+
+subcategories:
+  - slug: locksmith
+    label: "Locksmith"
+    include: true
+    overture_codes: [key_and_locksmith]
+
+pain_keywords:
+  - 24/7
+  - 24 hour
+  - emergency locksmith
+  - lockout
+  - locked out
+  - mobile locksmith
+  - call now
+  - leave a message
+  - we'll call you back
+
+review_pain_keywords:
+  - never answers
+  - went to voicemail
+  - voicemail
+  - couldn't get through
+  - never called back
+  - hard to reach
+
+negative_keywords:
+  - our dispatchers answer 24/7
+  - live dispatcher 24/7
+
+exclusions:
+  # SEED LISTS, INCOMPLETE. Lead-gen "locksmith near me" listings are caught by referral_listing rules.
+  chain_name_patterns:
+    - pop-a-lock
+    - pop a lock
+  chain_name_contains:
+    - home depot
+    - lowe's
+    - ace hardware
+  keywords:
+    - hardware store
+    - key duplication kiosk
+  note: "Many locksmith listings are call-center lead-gen fronts; the shared-phone and website-mismatch flags block those at the gate."
+
+staff_target: {min: 1, typical: 2, max: 10, hard_max: 30}
+
+best_call_windows:
+  - days: [mon, tue, wed, thu, fri]
+    start: "09:00"
+    end: "11:00"
+    why: "After the morning rush of lockouts, between jobs."
+  - days: [mon, tue, wed, thu, fri]
+    start: "14:00"
+    end: "16:00"
+    why: "Mid-afternoon lull."
+
+opener_templates:
+  - id: emergency_lockout
+    requires_signal: emergency_247_claim
+    template: "I saw {name} offers emergency lockout service, so when someone is locked out at midnight while you're on another job, who picks up?"
+  - id: leave_a_message
+    requires_signal: leave_message_text
+    template: "Your site asks callers to leave a message, and someone locked out usually calls the next locksmith instead of waiting."
+  - id: hiring_front_desk
+    requires_signal: hiring_receptionist
+    template: "I noticed {name} is hiring someone to answer phones, and we can cover every call starting this week while you look."
+  - id: phone_only
+    requires_signal: phone_only_booking
+    template: "It looks like the only way to reach {name} is by phone, so every missed call is a missed job."
+
+open_questions:
+  - "Value weight 0.60 is a guess (tickets ~$100-$300, but high volume and urgency)."
+  - "How many listings are lead-gen call centers? Measure the shared-phone block rate in the pilot."

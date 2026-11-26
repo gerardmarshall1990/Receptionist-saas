@@ -88,11 +88,22 @@ def enqueue(
 
 
 def claim(
-    conn: psycopg.Connection[Any], worker: str, n: int, max_attempts: int
+    conn: psycopg.Connection[Any],
+    worker: str,
+    n: int,
+    max_attempts: int,
+    niche_batch: str | None = None,
 ) -> list[tuple[str, str]]:
     """Claim up to n sites, best first. Two index-friendly steps: pending sites by priority
     (crawl_sites_claim_idx), then retryable errors and stale locks. A single OR query can't use
-    the index and scans the whole queue on every claim, which stalls workers at scale."""
+    the index and scans the whole queue on every claim, which stalls workers at scale.
+    `niche_batch`: only sites of businesses in that batch (a niche pilot never drifts into the
+    rest of the queue)."""
+    scope = ""
+    extra: tuple[Any, ...] = ()
+    if niche_batch is not None:
+        scope = " and domain in (select domain from businesses where niche_batch = %s)"
+        extra = (niche_batch,)
     take = (
         "update crawl_sites set status = 'running', locked_by = %s, locked_at = now(),"
         " attempts = attempts + 1, updated_at = now()"
@@ -100,14 +111,16 @@ def claim(
         "   order by priority desc, domain for update skip locked limit %s)"
         " returning domain, start_url"
     )
-    rows = conn.execute(take.format(cond="status = 'pending'"), (worker, n)).fetchall()
+    rows = conn.execute(
+        take.format(cond="status = 'pending'" + scope), (worker, *extra, n)
+    ).fetchall()
     if len(rows) < n:
         rows += conn.execute(
             take.format(
-                cond="(status = 'error' and attempts < %s and next_attempt_at <= now())"
-                " or (status = 'running' and locked_at < now() - %s::interval)"
+                cond="((status = 'error' and attempts < %s and next_attempt_at <= now())"
+                " or (status = 'running' and locked_at < now() - %s::interval))" + scope
             ),
-            (worker, max_attempts, LOCK_STALE, n - len(rows)),
+            (worker, max_attempts, LOCK_STALE, *extra, n - len(rows)),
         ).fetchall()
     return [(r[0], r[1]) for r in rows]
 
@@ -219,8 +232,10 @@ async def run(
     time_limit_s: float,
     run_id: str | None = None,
     signatures: tuple[str, ...] = (),
+    niche_batch: str | None = None,
 ) -> dict[str, int]:
-    """`signatures`: when given, saved pages are compacted (crawl/compact.py)."""
+    """`signatures`: when given, saved pages are compacted (crawl/compact.py).
+    `niche_batch`: claim only that batch's sites."""
     run_id = run_id or str(uuid.uuid4())
     worker = f"{socket.gethostname()}:{os.getpid()}"
     buf = Buffer(data_dir / "crawl" / "pages", run_id, signatures)
@@ -255,7 +270,9 @@ async def run(
                 break
             room = cfg.concurrency_sites * 2 - len(tasks)
             if room > 0 and claimed < max_sites and time.monotonic() < deadline:
-                batch = claim(conn, worker, min(room, max_sites - claimed), cfg.max_attempts)
+                batch = claim(
+                    conn, worker, min(room, max_sites - claimed), cfg.max_attempts, niche_batch
+                )
                 claimed += len(batch)
                 for domain, start in batch:
                     tasks.add(asyncio.create_task(one(domain, start)))

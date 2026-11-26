@@ -19,6 +19,16 @@ SPEC_CATEGORIES = {
     "law_small": 6,
     "auto_repair": 7,
 }
+# Tier 1 niche pilot (2026-11), ranked after the spec's seven.
+TIER1_CATEGORIES = {
+    "locksmith": 8,
+    "towing": 9,
+    "garage_door": 10,
+    "pest_control": 11,
+    "septic": 12,
+    "chiropractic": 13,
+    "veterinary": 14,
+}
 
 
 # ---------------------------------------------------------------- real config
@@ -26,7 +36,10 @@ SPEC_CATEGORIES = {
 
 def test_real_config_loads_with_the_seven_spec_categories_in_spec_order() -> None:
     cfg = load_config(REAL_CONFIG)
-    assert {slug: c.rank for slug, c in cfg.categories.items()} == SPEC_CATEGORIES
+    assert {slug: c.rank for slug, c in cfg.categories.items()} == {
+        **SPEC_CATEGORIES,
+        **TIER1_CATEGORIES,
+    }
 
 
 def test_pilot_order_matches_spec() -> None:
@@ -65,7 +78,8 @@ def test_every_opener_is_one_sentence_and_tied_to_an_eligible_signal() -> None:
 def test_watch_list_and_global_rules() -> None:
     cfg = load_config(REAL_CONFIG)
     assert cfg.global_.countries_enabled == ["US"]
-    assert "veterinary" in cfg.global_.watch_list
+    assert "veterinary" not in cfg.global_.watch_list  # configured in the Tier 1 pilot
+    assert "med_spa_salon" in cfg.global_.watch_list
     assert "ai receptionist" in cfg.global_.global_exclusion_keywords
 
 

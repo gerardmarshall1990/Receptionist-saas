@@ -40,7 +40,7 @@ from leads_engine.universe import normalize as nz
 # v14: electrical sample: "multiple locations" needs serving context (not "Multiple locations? Explore
 #      enterprise" or a 3-way switch "from multiple locations"); "speak with our customer service reps" isn't
 #      a job; a review's "someone call to set up appointment" isn't phone-only booking; "bill went from $320".
-EXTRACTOR_VERSION = "stage2-v15"
+EXTRACTOR_VERSION = "stage2-v16"
 SNIPPET = 300
 
 
@@ -128,7 +128,10 @@ EMERGENCY = _rx(
     r"24 ?[/-] ?7\W{0,25}(?:emergenc\w+|service|availab\w+|support|response|repairs?|plumb\w*|hvac|ac\b|dentist\w*)",
     r"24 hours? a day", r"24[- ]hours? (?:emergency|service|response)",
     # Not public services: "call emergency services", "connected to the emergency services".
-    r"(?<!call )(?<!dial )(?<!the )emergency (?:service|services|repairs?|calls?|appointments?|plumb\w*|dentist\w*|dental care|response)",
+    r"(?<!call )(?<!dial )(?<!the )emergency (?:service|services|repairs?|calls?|appointments?|plumb\w*|dentist\w*|dental care|response"
+    # v16 niches. Not "emergency vet": vet sites mostly refer owners to ANOTHER emergency hospital.
+    r"|locksmith\w*|lock ?outs?|towing|tow|roadside|drain\w*|septic|pest\w*|garage doors?|spring repairs?)",
+    r"24 ?[/-] ?7\W{0,25}(?:locksmith\w*|lock ?outs?|towing|tow|roadside|wrecker|septic|drain\w*|pest\w*|garage doors?)",
     r"same[- ]day emergenc\w+", r"around the clock", r"round[- ]the[- ]clock", r"day or night",
 )  # fmt: skip
 EMERGENCY_NOT = _rx(
@@ -218,6 +221,15 @@ PRICING_NOT = _rx(
     r"\b(?:loans?|financing|project sizes?|claims?|losses|budgets?)\b\W+(?:\w+\W+){0,4}$",
     r"\b(?:went|bills?|dropped|reduced|saved?)\b\W+(?:\w+\W+){0,4}$",  # "my power bill went from $320"
 )
+# v16: the practice says it wants new patients/clients (dental, chiro, ortho, vet). A value/intent
+# signal, scored at weight 0 until it grades >= 90% precise.
+NEW_PATIENTS = _rx(
+    r"(?:accepting|welcom\w*|now taking|taking) new (?:patients|clients)",
+    r"new (?:patients|clients) (?:are )?(?:always )?welcome",
+    r"new (?:patient|client) (?:special|offer|exam|appointments?|forms?)",
+)
+NEW_PATIENTS_NOT = _rx(r"\b(?:not|no longer|isn't|aren't|unable to)\b\W+(?:\w+\W+){0,3}$")
+
 MULTI_LOCATION = _rx(
     # "Our Locations" alone is mostly a service-area heading: require a count or addresses after it.
     r"our (?:two|three|four|five|\d+) (?:convenient )?locations",
@@ -421,6 +433,8 @@ def extract(pages: list[Page], business: dict[str, Any], cfg: AppConfig) -> Extr
         sig["pricing_hints"] = h
     if h := _first(MULTI_LOCATION, pages, not_before=MULTI_LOCATION_NOT):
         sig["multiple_locations"] = h
+    if h := _first(NEW_PATIENTS, pages, not_before=NEW_PATIENTS_NOT):
+        sig["new_patients_welcome"] = h
     if "is_chain" not in sig and (h := _first(OWNER_OPERATED, pages, not_before=OWNER_NOT)):
         sig["owner_operated"] = h
 

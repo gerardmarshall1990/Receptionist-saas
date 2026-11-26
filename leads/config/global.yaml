@@ -1,6 +1,6 @@
 # Global rules that apply across every category. Versioned: bump `version` on
 # any change so runs record which rules they used (config_hash also changes).
-version: 1
+version: 2
 
 # Rollout order per spec section 0. Only US is enabled until Stage 7.
 countries_enabled: [US]
@@ -198,10 +198,9 @@ pilot_sample:
 
 # Categories to test later; not configured yet (spec section 1).
 watch_list:
-  - veterinary
+  # Tier 2/3 niches are mapped in docs/ICP.md section 2b; configs are added when each tier starts.
   - med_spa_salon
   - property_management
-  - locksmith_towing_garage_door
   - real_estate_agency
 
 open_questions:

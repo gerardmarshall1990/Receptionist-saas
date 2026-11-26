@@ -165,7 +165,7 @@ def build_where(f: Filters, cfg: AppConfig) -> Where:
             w.add(f"{col} = %s", values[0])
         elif values:
             w.add(f"{col} = any(%s)", list(values))
-    if f.compliance in ("pass", "blocked"):
+    if f.compliance in ("pass", "blocked", "pending"):
         w.add("b.compliance_status = %s", f.compliance)
     if f.q and f.q.strip():
         w.add("b.search_text like %s", f"%{_like_escape(f.q.strip().lower())}%")
