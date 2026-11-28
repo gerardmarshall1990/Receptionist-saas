@@ -111,6 +111,9 @@ class Council:
         if not feats:
             feats = self.query("property", outSR=2193, returnGeometry="true",
                                where=f"UPPER(FORMATTEDADDRESS) LIKE '{_sql(pa.number + ' ' + pa.street).upper()}%' AND SITESTATUS='Current'")
+        fuzzy_note = ""
+        if not feats:
+            feats, fuzzy_note = self._fuzzy_street(pa)
         if pa.suburb and feats:
             sub = pa.suburb.upper()
             narrowed = [f for f in feats if sub in (f["attributes"].get("SUBURBNAME") or "").upper()
@@ -135,7 +138,7 @@ class Council:
             parent = props.get(root) or next(iter(props.values()))
             children = [f["attributes"] for pid, f in props.items() if pid != root]
             parent = dict(parent, children=children)
-            note = f"{len(children)} child property record(s) share this lot"
+            note = f"{len(children)} child property record(s) share this lot" + (f"; {fuzzy_note}" if fuzzy_note else "")
             return parent, Fact(parent["attributes"]["FORMATTEDADDRESS"], VERIFIED, src, note), cands
         if len(props) > 1:
             same = len(set(cands)) == 1
@@ -146,7 +149,28 @@ class Council:
         f = next(iter(props.values()))
         if not f.get("geometry", {}).get("rings"):
             return None, Fact(None, UNVERIFIED, src, "council record has no boundary geometry"), cands
-        return f, Fact(f["attributes"]["FORMATTEDADDRESS"], VERIFIED, src), cands
+        return f, Fact(f["attributes"]["FORMATTEDADDRESS"], VERIFIED, src, fuzzy_note), cands
+
+    def _fuzzy_street(self, pa: ParsedAddress) -> tuple[list[dict], str]:
+        """Fallback for loosely typed addresses, e.g. '14 bluegum Silverdale' -> 14 Blue Gum Avenue, Silverdale.
+        Street names are compared with spaces/punctuation removed and the street type optional; trailing
+        words must then match the suburb. Only an exact number match is accepted."""
+        squash = lambda t: re.sub(r"[^A-Z0-9]", "", t.upper())  # noqa: E731
+        words = pa.street.split() + (pa.suburb.split() if pa.suburb else [])
+        if not words or len(squash(words[0])) < 3:
+            return [], ""
+        feats = self.query("property", outSR=2193, returnGeometry="true",
+                           where=f"UPPER(STREETNAME) LIKE '{_sql(squash(words[0])[:3])}%' "
+                                 f"AND UPPER(STREETNUMBER)='{_sql(pa.number)}' AND SITESTATUS='Current'")
+        for k in range(len(words), 0, -1):
+            street, rest = squash("".join(words[:k])), " ".join(words[k:]).upper()
+            hits = [f for f in feats if squash(f["attributes"].get("STREETNAME") or "").startswith(street)
+                    and (not rest or rest in (f["attributes"].get("SUBURBNAME") or "").upper()
+                         or rest in (f["attributes"].get("FORMATTEDADDRESS") or "").upper())]
+            if hits:
+                names = sorted({h["attributes"]["FORMATTEDADDRESS"] for h in hits})
+                return hits, f"loose match: '{pa.number} {' '.join(words)}' read as {' / '.join(names[:3])}; confirm"
+        return [], ""
 
     def wgs84_geometry(self, objectid: int) -> list | None:
         feats = self.query("property", where=f"OBJECTID={int(objectid)}", outSR=4326, returnGeometry="true",

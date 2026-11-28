@@ -39,7 +39,8 @@ def _money(v: float) -> str:
 
 def gate_address(f: SiteFacts) -> GateResult:
     if f.matched_address.ok:
-        return GateResult("address", PASS, f"Matched to council property '{f.matched_address.value}'")
+        note = f" ({f.matched_address.note})" if f.matched_address.note else ""
+        return GateResult("address", PASS, f"Matched to council property '{f.matched_address.value}'{note}")
     return GateResult("address", CHECK, f"Address not matched: {f.matched_address.note or 'no match'}")
 
 

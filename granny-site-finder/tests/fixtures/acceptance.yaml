@@ -256,3 +256,15 @@
   observed_zone: Business - Mixed Use Zone
   observed_land_m2: 2273.4
   observed_title: Freehold
+- address: 14 bluegum Silverdale
+  why: loosely typed (no street type, 'bluegum' for 'Blue Gum'); Business - Mixed Use zone; flood plain on edge only
+  hand_checked: false
+  expected:
+    zone: fail
+    title: check
+    land_area: pass
+    flood: pass
+    overlays: pass
+  observed_zone: Business - Mixed Use Zone
+  observed_land_m2: 1008.7
+  observed_title: Freehold
