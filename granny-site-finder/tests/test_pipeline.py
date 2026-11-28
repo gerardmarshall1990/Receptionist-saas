@@ -265,3 +265,29 @@ def test_gsheet_source_parses_inbox(monkeypatch):
     assert [l.address for l in ls] == ["10 The Crest, Sunnyhills"]
     assert ls[0].price == 1_050_000 and ls[0].existing_dwellings == 1 and ls[0].url == "https://x/1"
     assert "gviz/tq?tqx=out:csv&sheet=Inbox" in src.url
+
+
+def test_results_page_paste():
+    from gsf.sources.results_text import ResultsTextSource, looks_like_results_page
+    text = """Featured
+14 Blue Gum Avenue, Silverdale, Rodney
+Asking price $950,000
+3 bed 1 bath
+Land area 1,009m²
+Open home Sat 1pm
+New listing
+28 Montmere Avenue, Te Atatu Peninsula, Waitakere City
+Enquiries over $980,000
+4 bedrooms
+713 m2
+Save
+10 The Crest, Sunnyhills, Manukau City
+Auction
+3 bed
+"""
+    assert looks_like_results_page(text)
+    ls = list(ResultsTextSource(text).listings())
+    assert [l.address.split(",")[0] for l in ls] == ["14 Blue Gum Avenue", "28 Montmere Avenue", "10 The Crest"]
+    assert (ls[0].price, ls[0].bedrooms, ls[0].land_area_m2) == (950_000, 3, 1009)
+    assert ls[1].price == 980_000 and ls[1].price_is_indicative and ls[1].bedrooms == 4
+    assert ls[2].price is None and ls[2].bedrooms == 3

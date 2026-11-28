@@ -25,6 +25,12 @@ class PasteSource(ListingSource):
         self.text = text or ""
 
     def listings(self) -> Iterator[Listing]:
+        from .results_text import ResultsTextSource, looks_like_results_page
+        if looks_like_results_page(self.text):          # a copied results page, not one-per-line input
+            src = ResultsTextSource(self.text)
+            yield from src.listings()
+            self.rejected.extend(src.rejected)
+            return
         for raw in self.text.splitlines():
             line = raw.strip()
             if not line or line.startswith("#"):
