@@ -26,6 +26,8 @@ SETTINGS = [  # label, config key, notes
     ("Stress: yield", ("stress", "target_yield"), ""),
     ("Stress: interest rate", ("stress", "interest_rate"), ""),
     ("Min interest cover", "min_io_cover", ""),
+    ("Unit value added (each)", "unit_value_added", "for the GV valuation: CV + units x this"),
+    ("LTV verdict basis", "value_basis", "lower (worse of income & GV) | income | gv"),
 ]
 # Settings!B2.. in the order above
 S = {k if isinstance(k, str) else k[1] + "_s": f"Settings!$B${i + 2}" for i, (_, k, _) in enumerate(SETTINGS)}
@@ -35,6 +37,7 @@ FEASO_HEADERS = [
     "Units", "Cost base", "Loan (incl. interest)", "Capitalised interest", "Annual rent", "NOI", "End value",
     "Profit (equity)", "Profit / loan", "LTV", "IO cover", "Cash left in after refi", "Stress LTV",
     "Stress IO cover", "Feaso verdict", "Feasibility doc", "Map", "Still to check",
+    "CV / GV (enter)", "GV value (CV + units)", "GV LTV", "LTV used for verdict",
 ]
 
 
@@ -42,7 +45,8 @@ def settings_rows(cfg: dict) -> list[list]:
     f = cfg["feaso"]
     rows = [["Setting", "Value", "Notes"]]
     for label, key, note in SETTINGS:
-        v = f["stress"][key[1]] if isinstance(key, tuple) else f.get(key, 1.0 if key == "min_io_cover" else None)
+        defaults = {"min_io_cover": 1.0, "unit_value_added": f.get("unit_cost_installed"), "value_basis": "lower"}
+        v = f["stress"][key[1]] if isinstance(key, tuple) else f.get(key, defaults.get(key))
         rows.append([label, v, note])
     return rows
 
@@ -68,9 +72,19 @@ def feaso_formulas(r: int) -> list[str]:
         f'=IF({ok},"",K{r}/O{r})',                                                               # R LTV
         f'=IF({ok},"",IF({S["interest_rate"]}=0,"n/a",N{r}/(K{r}*{S["interest_rate"]})))',      # S IO cover
         f'=IF({ok},"",MAX(0,K{r}-{S["ltv_cap"]}*O{r}))',                                         # T cash left in
-        f'=IF({ok},"",{loan_s}/({noi_s}/{S["target_yield_s"]}))',                                # U stress LTV
+        (f'=IF({ok},"",IF(AB{r}="",{loan_s}/({noi_s}/{S["target_yield_s"]}),IF({S["value_basis"]}="gv",{loan_s}/AB{r},'
+         f'IF({S["value_basis"]}="income",{loan_s}/({noi_s}/{S["target_yield_s"]}),MAX({loan_s}/({noi_s}/{S["target_yield_s"]}),{loan_s}/AB{r})))))'),  # U stress LTV
         f'=IF({ok},"",{noi_s}/({loan_s}*{S["interest_rate_s"]}))',                               # V stress IO
-        f'=IF({E}="","Enter price",IF(M{r}="","Enter rents",IF(AND(R{r}<={S["ltv_cap"]},S{r}>={S["min_io_cover"]}),"PASS","FAIL")))',  # W
+        f'=IF({E}="","Enter price",IF(M{r}="","Enter rents",IF(AND(AD{r}<={S["ltv_cap"]},S{r}>={S["min_io_cover"]}),"PASS","FAIL")))',  # W
+    ]
+
+
+def gv_formulas(r: int) -> list[str]:
+    """Formulas for AB..AD (AA is the CV input)."""
+    return [
+        f'=IF(OR(P{r}="",AA{r}=""),"",AA{r}+$I{r}*{S["unit_value_added"]})',                       # AB GV value
+        f'=IF(AB{r}="","",K{r}/AB{r})',                                                            # AC GV LTV
+        f'=IF(P{r}="","",IF(AB{r}="",R{r},IF({S["value_basis"]}="gv",AC{r},IF({S["value_basis"]}="income",R{r},MAX(R{r},AC{r})))))',  # AD
     ]
 
 
@@ -97,6 +111,8 @@ def feaso_rows(sites: list[dict], doc_links: dict[int, str] | None = None, first
             f'=HYPERLINK("{link}","feasibility")' if link else "",
             f'=HYPERLINK("https://www.google.com/maps?q={lat},{lon}","map")' if lat is not None else "",
             checks,
+            L.get("cv") or "",
+            *gv_formulas(r),
         ])
     return rows
 
@@ -132,7 +148,11 @@ def doc_html(site: dict, cfg: dict, sheet_url: str, feaso_row: int | None) -> st
                  f"<tr><td><b>Profit (equity)</b></td><td><b>{_m(b['equity'])}</b></td></tr>"
                  f"<tr><td>LTV (cap {_p(rep['inputs']['ltv_cap'])})</td><td>{_p(b['ltv'])} {'PASS' if b['ltv_pass'] else 'FAIL'}</td></tr>"
                  f"<tr><td>Interest cover</td><td>{io_txt}</td></tr>"
-                 f"<tr><td>Refinance headroom</td><td>{_m(b['refi_headroom'])}</td></tr></table>"
+                 f"<tr><td>Refinance headroom</td><td>{_m(b['refi_headroom'])}</td></tr>"
+                 + (f"<tr><td>GV value (CV {_m(rep['inputs'].get('cv'))} + units)</td><td>{_m(b.get('gv_value'))}</td></tr>"
+                    f"<tr><td>GV LTV</td><td>{_p(b.get('gv_ltv'))}</td></tr>" if b.get('gv_value') else
+                    "<tr><td>GV valuation</td><td>CV not entered (add it in the Feaso tab)</td></tr>")
+                 + f"<tr><td><b>LTV used for verdict ({e(b.get('value_used', 'income'))})</b></td><td><b>{_p(b.get('ltv_used', b['ltv']))}</b></td></tr></table>"
                  "<h3>Stress cases</h3><table border='1' cellpadding='4'><tr><th>Case</th><th>LTV</th><th>IO cover</th><th>Equity</th></tr>"
                  + "".join(f"<tr><td>{e(k)}</td><td>{_p(x['ltv'])}</td><td>{'n/a' if x['io_cover'] is None else format(x['io_cover'], '.2f')}</td><td>{_m(x['equity'])}</td></tr>"
                            for k, x in rep["scenarios"].items()) + "</table>")

@@ -45,6 +45,7 @@ class ListingPatch(BaseModel):
     existing_dwellings: int | None = None
     description: str | None = None
     land_area_m2: float | None = None
+    cv: float | None = None
     existing_rent_override: float | None = None
     unit_rent_override: float | None = None
     url: str | None = None
@@ -65,6 +66,9 @@ class FeasoIn(BaseModel):
     price: float | None = None
     existing_rent_pw: float | None = None
     unit_rent_pw: float | None = None
+    cv: float | None = None
+    unit_value_added: float | None = None
+    value_basis: str | None = None
 
 
 # -------------------------------------------------------------------- jobs --

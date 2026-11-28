@@ -15,7 +15,8 @@ from ..models import Listing
 from .csv_source import CsvSource
 from .base import ListingSource
 
-HEADER_MAP = {"listing_url": "url", "notes_/_listing_text": "description", "notes": "description"}
+HEADER_MAP = {"listing_url": "url", "notes_/_listing_text": "description", "notes": "description",
+              "cv": "cv", "gv": "cv", "cv_/_gv": "cv"}
 
 
 def export_url(sheet: str, tab: str = "Inbox") -> str:

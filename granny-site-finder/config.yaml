@@ -51,6 +51,9 @@ feaso:
   units: 2                             # UNITS
   unit_cost_installed: 150000          # per unit: supplier + foundations + services
   misc: 40000                          # per site: legal, LIM, PIM, consents, design, DCs
+  # Second valuation when the listing's CV (council GV) is known: CV + value each unit adds.
+  unit_value_added: 150000             # per unit; default = installed cost (no development margin)
+  value_basis: lower                   # lower (bank-conservative) | income | gv : which value the LTV verdict uses
   min_io_cover: 1.0
   stress:                              # applied individually AND combined (combined = worst case)
     rent_change: -0.15

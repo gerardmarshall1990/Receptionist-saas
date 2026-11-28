@@ -191,7 +191,10 @@ class Pipeline:
         if missing:
             return out | {"status": "incomplete", "note": "missing " + "; ".join(missing), "report": None}
         try:
-            inp = feaso_inputs(self.cfg, listing.price, ex["weekly"], un["weekly"], overrides)
+            ov = dict(overrides or {})
+            if listing.cv and "cv" not in ov:
+                ov["cv"] = listing.cv
+            inp = feaso_inputs(self.cfg, listing.price, ex["weekly"], un["weekly"], ov)
             rep = fz.run_with_stress(inp, stress_spec(self.cfg))
         except fz.FeasoInputError as e:
             return out | {"status": "incomplete", "note": str(e), "report": None}

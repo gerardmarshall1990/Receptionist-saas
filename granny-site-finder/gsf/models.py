@@ -46,6 +46,7 @@ class Listing:
     listing_date: str | None = None
     description: str | None = None
     existing_dwellings: int | None = None  # explicit count if the user knows it
+    cv: float | None = None                # council capital value (GV/CV), e.g. from the listing
     existing_rent_override: float | None = None
     unit_rent_override: float | None = None
 

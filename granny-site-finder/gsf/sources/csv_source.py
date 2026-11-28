@@ -14,7 +14,7 @@ from ..models import Listing
 from .base import ListingSource, build_listing
 
 ALIASES = {"land": "land_area_m2", "land_area": "land_area_m2", "land_m2": "land_area_m2", "beds": "bedrooms",
-           "baths": "bathrooms", "id": "listing_id", "notes": "description", "dwellings": "existing_dwellings"}
+           "baths": "bathrooms", "id": "listing_id", "notes": "description", "dwellings": "existing_dwellings", "capital_value": "cv", "gv": "cv", "rv": "cv"}
 
 
 class CsvSource(ListingSource):

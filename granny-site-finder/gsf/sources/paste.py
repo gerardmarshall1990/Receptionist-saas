@@ -1,7 +1,7 @@
 """Paste-addresses source (CLI stdin / web form textarea).
 
 One listing per line. Either just an address, or pipe-separated fields:
-    address | price | bedrooms | existing dwellings | notes
+    address | price | bedrooms | existing dwellings | CV | notes
 e.g.
     12 Sandringham Rd, Kingsland | $1,050,000 | 3 | 1
     45 Example Street, Mt Roskill | Enquiries over 950k | 3
@@ -14,7 +14,7 @@ from typing import Iterator
 from ..models import Listing
 from .base import ListingSource, build_listing
 
-FIELDS = ["address", "price", "bedrooms", "existing_dwellings", "description"]
+FIELDS = ["address", "price", "bedrooms", "existing_dwellings", "cv", "description"]
 
 
 class PasteSource(ListingSource):

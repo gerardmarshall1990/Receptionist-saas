@@ -56,6 +56,7 @@ def build_listing(source: str, fields: dict[str, Any]) -> Listing:
         listing_date=(fields.get("listing_date") or None),
         description=(fields.get("description") or None),
         existing_dwellings=_int(fields.get("existing_dwellings")),
+        cv=parse_price(fields.get("cv") or fields.get("gv") or fields.get("capital_value") or None)[0],
         existing_rent_override=_float(fields.get("existing_rent_override")),
         unit_rent_override=_float(fields.get("unit_rent_override")),
     )

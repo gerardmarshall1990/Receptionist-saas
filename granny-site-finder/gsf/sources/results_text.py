@@ -28,7 +28,7 @@ def _is_addr(line: str) -> bool:
                 and parse_address(line))
 
 
-_PRICE = re.compile(r"(\$\s?\d[\d,.]*\s*(k|m)?)|auction|tender|deadline|negotiation|enquiries over|price by|poa", re.I)
+_PRICE = re.compile(r"^(?!.*\b(CV|RV|GV|capital value|rateable value)\b).*((\$\s?\d[\d,.]*\s*(k|m)?)|auction|tender|deadline|negotiation|enquiries over|price by|poa)", re.I)
 _BEDS = re.compile(r"\b(\d+)\s*(bed|bedroom|bdrm|br)s?\b", re.I)
 _LAND = re.compile(r"(?:land(?:\s*area)?[:\s]*)?(\d[\d,.]*)\s*(m²|m2|sqm|square metres)", re.I)
 _URL = re.compile(r"https?://\S+")
@@ -68,11 +68,13 @@ class ResultsTextSource(ListingSource):
                 if v >= 100:          # ignore floor areas < 100 m² mis-read; prefer the largest (land) figure
                     land = max(land or 0, v)
             url = _URL.search(body)
+            cvm = re.search(r"\b(?:CV|RV|GV|capital value|rateable value|government valuation)\b[:\s]*\$?\s*([\d,.]+\s*[km]?)", body, re.I)
             try:
                 yield build_listing(self.name, {
                     "address": addr, "price": ptxt or "", "price_text": ptxt or "",
                     "bedrooms": beds.group(1) if beds else "", "land_area_m2": land or "",
                     "url": url.group(0) if url else "", "description": body[:1000],
+                    "cv": cvm.group(1) if cvm else "",
                 })
             except ValueError as e:
                 self.rejected.append((addr, str(e)))

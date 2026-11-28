@@ -52,6 +52,8 @@ flagged as indicative; "Auction"/"Tender" give no price, so the site shows **inc
 - **Feaso** tab: every non-failed site. Yellow cells are inputs (price, bedrooms, rents, units). Profit,
   LTV, IO cover, cash left in and combined stress are live formulas that mirror `gsf/feaso.py`
   (checked by `tests/test_sheet_feaso.py` and against hand case 1 in the live sheet). Sort by Profit.
+- **GV check**: enter the listing's CV in the Feaso tab; GV value = CV + units × unit value added; the
+  verdict uses the worse of income LTV and GV LTV (Settings → LTV verdict basis).
 - **Settings** tab: rate, capitalised months, draw, yield, basis, LTV cap, unit cost, misc, stress. Change
   one and every row recalculates.
 - **Feasibility doc** link per site: Google Doc with the feaso, stress cases, rent evidence, gates and title.

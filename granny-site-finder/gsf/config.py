@@ -64,7 +64,8 @@ def load_config(path: str | Path | None = None) -> dict[str, Any]:
 
 
 FEASO_KEYS = ("interest_rate", "cap_months", "draw_factor", "target_yield", "yield_basis",
-              "opex_ratio", "ltv_cap", "units", "unit_cost_installed", "misc", "min_io_cover")
+              "opex_ratio", "ltv_cap", "units", "unit_cost_installed", "misc", "min_io_cover",
+              "cv", "unit_value_added", "value_basis")
 
 
 def feaso_inputs(cfg: dict, price: float, existing_rent: float, unit_rent: float,

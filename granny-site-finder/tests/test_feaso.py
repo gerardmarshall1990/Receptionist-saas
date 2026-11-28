@@ -117,3 +117,17 @@ def test_zero_interest_io_cover_is_none_and_passes():
 def test_bad_inputs_raise_clear_error(kwargs):
     with pytest.raises(FeasoInputError):
         run(FeasoInputs(**kwargs))
+
+
+def test_gv_summation_value_and_lower_basis():
+    # Case 1 + CV $1,000,000; units add their cost (2 x 150,000) -> GV value 1,300,000
+    # gv_ltv = 1,284,974.09 / 1,300,000 = 0.988442 ; income LTV 0.823701 -> verdict uses the worse (GV)
+    r = run(FeasoInputs(price=900_000, existing_rent_pw=700, unit_rent_pw=550, cv=1_000_000))
+    assert r.gv_value == 1_300_000
+    assert r.gv_ltv == approx(0.988442)
+    assert r.ltv == approx(0.823701)            # income LTV unchanged
+    assert r.ltv_used == approx(0.988442) and r.value_used == "gv" and not r.ltv_pass
+    # income basis ignores GV for the verdict; custom unit value added
+    r2 = run(FeasoInputs(price=900_000, existing_rent_pw=700, unit_rent_pw=550, cv=1_000_000,
+                         unit_value_added=300_000, value_basis="income"))
+    assert r2.gv_value == 1_600_000 and r2.ltv_used == approx(0.823701) and r2.value_used == "income"
