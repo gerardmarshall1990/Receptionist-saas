@@ -33,8 +33,8 @@ class Linz:
     def _features(self, layer_id: int, rings: list) -> list[dict]:
         xs = [p[0] for r in rings for p in r]
         ys = [p[1] for r in rings for p in r]
-        # Koordinates WFS: key in the path; bbox axis order for EPSG:2193 in WFS 2.0 is northing,easting.
-        url = self.base.replace("/services/", f"/services;key={self.key}/")
+        # Koordinates accepts the key as "Authorization: key <KEY>"; bbox axis order for EPSG:2193 in WFS 2.0 is N,E.
+        url = self.base
         params = {
             "service": "WFS", "version": "2.0.0", "request": "GetFeature",
             "typeNames": f"layer-{layer_id}", "outputFormat": "json", "srsName": "EPSG:2193",
@@ -42,6 +42,7 @@ class Linz:
             "count": 200,
         }
         data = self.http.request_json("GET", url, params, cache_days=self.cache_days,
+                                      headers={"Authorization": f"key {self.key}"},
                                       cache_url_label=f"linz-wfs-layer-{layer_id}")
         return data.get("features", [])
 
