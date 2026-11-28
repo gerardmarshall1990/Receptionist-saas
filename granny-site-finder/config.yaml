@@ -1,0 +1,111 @@
+# Granny-Site Finder configuration.
+# Every threshold and assumption lives here. Secrets do NOT: put them in .env.
+# Edit and re-run; no code changes needed.
+
+gates:
+  allowed_zones:                       # Auckland Unitary Plan (operative) base zone names
+    - "Residential - Mixed Housing Suburban Zone"
+    - "Residential - Mixed Housing Urban Zone"
+  min_land_m2: 600                     # MIN_LAND_M2
+  max_price: 1200000                   # MAX_PRICE (NZD). Listings above this fail.
+  required_existing_dwellings: 1
+  # Share of the parcel treated as the "likely building area": the parcel is shrunk
+  # towards its centroid by this linear factor. Flood/zone hits on the full parcel but
+  # not on this core are reported as "partial" (soft flag), not a rejection.
+  building_core_scale: 0.6
+  # A site with no Road-zone polygon within this distance is flagged as a possible rear site.
+  road_frontage_tolerance_m: 1.5
+  narrow_site_width_m: 15              # soft flag if the parcel's minimum width is below this
+  rub_proximity_m: 200                 # soft flag if within this distance of the Rural Urban Boundary
+  # Overlays. "block" = gate fails; "flag" = soft flag only.
+  overlays:
+    heritage_extent:   block
+    heritage_place:    block
+    sea:               block
+    mana_whenua:       block
+    special_character: flag
+    volcanic_viewshaft_regional: flag
+    volcanic_viewshaft_local: flag
+    notable_tree:      flag
+  flood_layers:                        # any hit on the building core fails the flood gate
+    - flood_plain
+    - flood_prone
+    - overland_flow_path
+  flood_sensitive_is_flag: true        # Flood Sensitive Areas = soft flag
+  # Overland flow paths are mapped by upstream catchment: 1=2000-4000m2, 2=4000m2-1ha,
+  # 3=1-3ha, 4=3-100ha, 5=100ha+. Paths below this group are ignored. 1 = count every OLFP (spec).
+  overland_flow_min_catchment_group: 1
+
+feaso:
+  interest_rate: 0.07                  # INTEREST_RATE
+  cap_months: 6                        # CAP_MONTHS
+  draw_factor: 1.0                     # DRAW_FACTOR (1.0 conservative; 0.6 allowed)
+  target_yield: 0.06                   # TARGET_YIELD
+  yield_basis: gross                   # gross | net
+  opex_ratio: 0.25                     # OPEX_RATIO (net basis only)
+  ltv_cap: 0.65                        # LTV_CAP
+  units: 2                             # UNITS
+  unit_cost_installed: 150000          # per unit: supplier + foundations + services
+  misc: 40000                          # per site: legal, LIM, PIM, consents, design, DCs
+  min_io_cover: 1.0
+  stress:                              # applied individually AND combined (combined = worst case)
+    rent_change: -0.15
+    cost_change: 0.10
+    target_yield: 0.065
+    interest_rate: 0.08
+
+rents:
+  source: bond_csv                     # bond_csv (verified) | market_rent_api (not implemented)
+  bond_csv_url: "https://www.tenancy.govt.nz/assets/Uploads/Tenancy/Rental-bond-data/detailed-quarterly-tenancy-q1-2020q3-november-2026.csv"
+  bond_page_url: "https://www.tenancy.govt.nz/about-tenancy-services/data-and-statistics/rental-bond-data/"
+  cache_days: 30                       # re-download monthly
+  min_bonds: 10                        # a cell with fewer lodged bonds is treated as too thin
+  pool_quarters: 4                     # if the latest quarter is thin, pool this many recent quarters
+  neighbour_radius_m: 1500             # then pool SA2s within this radius (0 = off)
+  unit_bedrooms: 2
+  unit_rent_stat: median               # lower_quartile | median | upper_quartile
+  existing_rent_stat: median
+  # Dwelling types tried in order (bond data categories: House, Flat, Apartment, ALL)
+  existing_dwelling_types: [House, ALL]
+  unit_dwelling_types: [House, Flat, ALL]
+  default_bedrooms_if_unknown: null    # null = existing rent unavailable if listing has no bedroom count
+
+http:
+  timeout_s: 30
+  retries: 3
+  backoff_s: 1.5
+  min_interval_s: 0.2                  # per-host rate limit
+  cache_days:
+    council: 7
+    linz: 30
+    sa2: 365
+
+sources:
+  council_base: "https://services1.arcgis.com/n4yPwebTjJCmXB6W/arcgis/rest/services"
+  sa2_layer: "https://services2.arcgis.com/vKb0s8tBIA3bdocZ/arcgis/rest/services/Census2018_dwellings_counts_by_SA2/FeatureServer/0"
+  linz_wfs: "https://data.linz.govt.nz/services/wfs"
+  linz_layers:
+    parcels: 50772
+    titles: 50804
+    buildings: 101290
+  council_layers:                      # FeatureServer service names (layer 0) — verified 2026-11-28
+    property: AC_Property_Query
+    zone: Unitary_Plan_Base_Zone
+    flood_plain: Flood_Plains
+    flood_prone: Flood_Prone_Areas
+    overland_flow_path: Overland_Flow_Paths
+    flood_sensitive: Flood_Sensitive_Areas
+    heritage_extent: Historic_Heritage_Overlay_Extent_of_Place
+    heritage_place: Historic_Heritage_Overlay_Place
+    sea: Significant_Ecological_Areas_Overlay
+    mana_whenua: Sites_and_Places_of_Significance_to_Mana_Whenua_Overlay
+    special_character: Special_Character_Areas_Overlay_Residential_and_Business
+    volcanic_viewshaft_regional: Regionally_Significant_Volcanic_Viewshafts_And_Height_Sensitive_Areas_Overlay
+    volcanic_viewshaft_local: Locally_Significant_Volcanic_Viewshafts_Overlay
+    notable_tree: Notable_Trees_Overlay
+    rural_urban_boundary: Rural_Urban_Boundary
+    pc120: PC120Revised_PROD_PropertySummary
+
+storage:
+  db_path: data/gsf.sqlite
+  reports_dir: data/reports

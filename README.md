@@ -2,6 +2,8 @@
 
 AI outbound sales engine + AI receptionist product. See the build spec for the full vision; this repo is built in the spec's Part 3 order.
 
+> **Also in this repo:** [`granny-site-finder/`](granny-site-finder/README.md), a separate Python tool for screening Auckland house + 2-unit sites. It is unrelated to Front Desk.
+
 ## Status
 
 | Area | State |

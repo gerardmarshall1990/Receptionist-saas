@@ -1,0 +1,258 @@
+# Acceptance fixture: real Auckland addresses and their expected gate outcomes.
+# Expected values were generated from the live council layers on 2026-11-28 and MUST be
+# hand-checked (council GeoMaps / Unitary Plan viewer + LINZ title). Set hand_checked: true
+# once confirmed, and correct any expected value that is wrong. Run with:
+#   GSF_LIVE=1 python -m pytest tests/test_acceptance_live.py
+# Title is 'check' for freehold-looking sites until LINZ_API_KEY is set (then expect 'pass').
+- address: 12 Sandringham Road, Kingsland
+  why: Single House zone; OLFP; special character
+  hand_checked: false
+  expected:
+    zone: fail
+    title: check
+    land_area: pass
+    flood: fail
+    overlays: pass
+  observed_zone: Residential - Single House Zone
+  observed_land_m2: 615.5
+  observed_title: Freehold
+- address: 238 Sandringham Road, Sandringham
+  why: THAB zone; flood plain + flood prone + OLFP
+  hand_checked: false
+  expected:
+    zone: fail
+    title: check
+    land_area: pass
+    flood: fail
+    overlays: pass
+  observed_zone: Residential - Terrace Housing and Apartment Building Zone
+  observed_land_m2: 773.0
+  observed_title: Freehold
+- address: 1/304A Sandringham Road, Sandringham
+  why: cross-lease flat; Mt Eden viewshaft
+  hand_checked: false
+  expected:
+    zone: fail
+    title: fail
+    land_area: pass
+    flood: pass
+    overlays: pass
+  observed_zone: Residential - Terrace Housing and Apartment Building Zone
+  observed_land_m2: 635.1
+  observed_title: Cross-lease
+- address: 8A Playfair Road, Mount Roskill
+  why: cross-lease, MHU
+  hand_checked: false
+  expected:
+    zone: pass
+    title: fail
+    land_area: pass
+    flood: pass
+    overlays: pass
+  observed_zone: Residential - Mixed Housing Urban Zone
+  observed_land_m2: 859.9
+  observed_title: Cross-lease
+- address: 20 Roseman Avenue, Mount Roskill
+  why: parent lot with cross-lease child record
+  hand_checked: false
+  expected:
+    zone: pass
+    title: fail
+    land_area: pass
+    flood: pass
+    overlays: pass
+  observed_zone: Residential - Mixed Housing Urban Zone
+  observed_land_m2: 830.5
+  observed_title: Cross-lease
+- address: 6 Freeland Avenue, Mount Roskill
+  why: MHU, under 600 m2
+  hand_checked: false
+  expected:
+    zone: pass
+    title: check
+    land_area: fail
+    flood: pass
+    overlays: pass
+  observed_zone: Residential - Mixed Housing Urban Zone
+  observed_land_m2: 435.3
+  observed_title: Freehold
+- address: 7B Kallu Crescent, Mount Roskill
+  why: MHU, share in access lot (JOAL)
+  hand_checked: false
+  expected:
+    zone: pass
+    title: check
+    land_area: pass
+    flood: pass
+    overlays: pass
+  observed_zone: Residential - Mixed Housing Urban Zone
+  observed_land_m2: 1079.4
+  observed_title: Freehold
+- address: 80 Coronation Road, Papatoetoe
+  why: MHU, flood
+  hand_checked: false
+  expected:
+    zone: pass
+    title: check
+    land_area: pass
+    flood: fail
+    overlays: pass
+  observed_zone: Residential - Mixed Housing Urban Zone
+  observed_land_m2: 1000.6
+  observed_title: Freehold
+- address: 2/38 Glen Avenue, Papatoetoe
+  why: cross-lease without SH in description
+  hand_checked: false
+  expected:
+    zone: pass
+    title: fail
+    land_area: pass
+    flood: pass
+    overlays: pass
+  observed_zone: Residential - Mixed Housing Suburban Zone
+  observed_land_m2: 971.5
+  observed_title: Cross-lease
+- address: 17 Coates Road, Papatoetoe
+  why: MHS freehold-looking candidate
+  hand_checked: false
+  expected:
+    zone: pass
+    title: check
+    land_area: pass
+    flood: pass
+    overlays: pass
+  observed_zone: Residential - Mixed Housing Suburban Zone
+  observed_land_m2: 864.1
+  observed_title: Freehold
+- address: 4/89 Kolmar Road, Papatoetoe
+  why: cross-lease flat; blocking overlay
+  hand_checked: false
+  expected:
+    zone: pass
+    title: fail
+    land_area: pass
+    flood: pass
+    overlays: fail
+  observed_zone: Residential - Mixed Housing Suburban Zone
+  observed_land_m2: 2023.9
+  observed_title: Cross-lease
+- address: 17 Wilmay Avenue, Papatoetoe
+  why: MHU, flood
+  hand_checked: false
+  expected:
+    zone: pass
+    title: check
+    land_area: pass
+    flood: fail
+    overlays: pass
+  observed_zone: Residential - Mixed Housing Urban Zone
+  observed_land_m2: 2090.8
+  observed_title: Freehold
+- address: 5 Woodglen Road, Glen Eden
+  why: MHU, flood
+  hand_checked: false
+  expected:
+    zone: pass
+    title: check
+    land_area: pass
+    flood: fail
+    overlays: pass
+  observed_zone: Residential - Mixed Housing Urban Zone
+  observed_land_m2: 2020.9
+  observed_title: Freehold
+- address: 318 West Coast Road, Glen Eden
+  why: THAB zone
+  hand_checked: false
+  expected:
+    zone: fail
+    title: check
+    land_area: pass
+    flood: pass
+    overlays: pass
+  observed_zone: Residential - Terrace Housing and Apartment Building Zone
+  observed_land_m2: 857.0
+  observed_title: Freehold
+- address: 1/44A Gladys Avenue, Glenfield
+  why: cross-lease, MHS
+  hand_checked: false
+  expected:
+    zone: pass
+    title: fail
+    land_area: pass
+    flood: pass
+    overlays: pass
+  observed_zone: Residential - Mixed Housing Suburban Zone
+  observed_land_m2: 1044.2
+  observed_title: Cross-lease
+- address: 206/13 Kaipatiki Road, Glenfield
+  why: unit title (principal + accessory unit)
+  hand_checked: false
+  expected:
+    zone: fail
+    title: fail
+    land_area: pass
+    flood: pass
+    overlays: pass
+  observed_zone: Residential - Terrace Housing and Apartment Building Zone
+  observed_land_m2: 1876.9
+  observed_title: Unit title
+- address: 22 Portadown Avenue, Pakuranga Heights
+  why: MHU candidate
+  hand_checked: false
+  expected:
+    zone: pass
+    title: check
+    land_area: pass
+    flood: pass
+    overlays: pass
+  observed_zone: Residential - Mixed Housing Urban Zone
+  observed_land_m2: 731.7
+  observed_title: Freehold
+- address: 10 The Crest, Sunnyhills
+  why: MHS candidate
+  hand_checked: false
+  expected:
+    zone: pass
+    title: check
+    land_area: pass
+    flood: pass
+    overlays: pass
+  observed_zone: Residential - Mixed Housing Suburban Zone
+  observed_land_m2: 682.7
+  observed_title: Freehold
+- address: 10 Janet Street, Sunnyhills
+  why: MHS candidate
+  hand_checked: false
+  expected:
+    zone: pass
+    title: check
+    land_area: pass
+    flood: pass
+    overlays: pass
+  observed_zone: Residential - Mixed Housing Suburban Zone
+  observed_land_m2: 693.2
+  observed_title: Freehold
+- address: 28 Montmere Avenue, Te Atatu Peninsula
+  why: MHU candidate
+  hand_checked: false
+  expected:
+    zone: pass
+    title: check
+    land_area: pass
+    flood: pass
+    overlays: pass
+  observed_zone: Residential - Mixed Housing Urban Zone
+  observed_land_m2: 712.9
+  observed_title: Freehold
+- address: 4 Selwyn Street, Onehunga
+  why: Business - Mixed Use zone
+  hand_checked: false
+  expected:
+    zone: fail
+    title: check
+    land_area: pass
+    flood: pass
+    overlays: pass
+  observed_zone: Business - Mixed Use Zone
+  observed_land_m2: 2273.4
+  observed_title: Freehold

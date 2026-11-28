@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Granny-Site Finder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root {
+  --bg: #f6f5f2; --panel: #ffffff; --ink: #1c1d1f; --ink-2: #4a4d52; --ink-3: #7c8087;
+  --line: #e6e3dd; --line-2: #d6d2ca; --hover: #f1efea; --sel: #eef3ef;
+  --accent: #1f5c46; --accent-ink: #ffffff;
+  --pass: #1e7a4d; --pass-bg: #e3f2e9; --check: #94600a; --check-bg: #fbf0d9;
+  --fail: #b3322b; --fail-bg: #fbe5e2; --inc: #5b6068; --inc-bg: #eceef0; --flag: #3d5a99; --flag-bg: #e6ecf8;
+  --r: 10px; --shadow: 0 1px 2px rgba(20,20,20,.04), 0 4px 16px rgba(20,20,20,.05);
+  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #121315; --panel: #1a1c1f; --ink: #ecebe8; --ink-2: #b7b6b2; --ink-3: #85868a;
+  --line: #2a2c30; --line-2: #36393e; --hover: #212327; --sel: #1d2a24; --accent: #4fae86; --accent-ink: #0d1a14;
+  --pass: #5cc48d; --pass-bg: #17301f; --check: #e2ac4a; --check-bg: #33280f; --fail: #ee7a70; --fail-bg: #3a1a17;
+  --inc: #a0a5ad; --inc-bg: #26292d; --flag: #8fa8e6; --flag-bg: #1d2538; --shadow: none; } }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--bg); color: var(--ink); font: 14px/1.45 Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased; }
+button, input, select, textarea { font: inherit; color: inherit; }
+.num { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; text-align: right; white-space: nowrap; }
+.muted { color: var(--ink-3); }
+
+header { display: flex; align-items: center; gap: 16px; padding: 14px 24px; border-bottom: 1px solid var(--line); background: var(--panel); }
+header h1 { font-size: 15px; font-weight: 650; letter-spacing: -.01em; margin: 0; }
+header h1 span { color: var(--ink-3); font-weight: 500; margin-left: 8px; }
+header .spacer { flex: 1; }
+.btn { white-space: nowrap; border: 1px solid var(--line-2); background: var(--panel); padding: 7px 12px; border-radius: 8px; cursor: pointer; font-weight: 500; font-size: 13px; text-decoration: none; display: inline-flex; gap: 6px; align-items: center; }
+.btn:hover { background: var(--hover); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.primary:hover { filter: brightness(1.07); }
+.btn.small { padding: 4px 9px; font-size: 12px; }
+
+main { display: grid; grid-template-columns: minmax(0, 1fr) 480px; height: calc(100% - 59px); }
+@media (max-width: 1280px) { main { grid-template-columns: minmax(0,1fr) 420px; } }
+.list { overflow: auto; padding: 18px 20px 40px; }
+.toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }
+.search { flex: 1; min-width: 200px; border: 1px solid var(--line-2); background: var(--panel); border-radius: 8px; padding: 7px 11px; }
+.chips { display: flex; gap: 6px; }
+.chip { border: 1px solid var(--line-2); background: var(--panel); border-radius: 999px; padding: 4px 11px; font-size: 12.5px; cursor: pointer; display: inline-flex; gap: 6px; align-items: center; }
+.chip b { font-weight: 600; font-variant-numeric: tabular-nums; }
+.chip.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+table.grid { width: 100%; border-collapse: separate; border-spacing: 0; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; box-shadow: var(--shadow); }
+.grid th { position: sticky; top: 0; background: var(--panel); text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-3); padding: 10px 9px; border-bottom: 1px solid var(--line); cursor: pointer; user-select: none; white-space: nowrap; }
+.grid th.num { text-align: right; }
+.grid th .arr { opacity: .35; margin-left: 3px; }
+.grid th.sorted .arr { opacity: 1; color: var(--ink); }
+.grid td { padding: 10px 9px; white-space: nowrap; border-bottom: 1px solid var(--line); vertical-align: top; }
+.grid td.wrap { white-space: normal; width: 100%; min-width: 180px; }
+.grid td.wrap .addr { overflow-wrap: anywhere; }
+.grid tr:last-child td { border-bottom: 0; }
+.grid tbody tr { cursor: pointer; }
+.grid tbody tr:hover td { background: var(--hover); }
+.grid tbody tr.sel td { background: var(--sel); }
+.addr { font-weight: 550; }
+.sub { color: var(--ink-3); font-size: 12px; margin-top: 2px; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pill { display: inline-block; font-size: 11px; font-weight: 650; letter-spacing: .04em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; }
+.pill.pass { color: var(--pass); background: var(--pass-bg); } .pill.check { color: var(--check); background: var(--check-bg); }
+.pill.fail { color: var(--fail); background: var(--fail-bg); } .pill.incomplete, .pill.pending, .pill.error { color: var(--inc); background: var(--inc-bg); }
+.pill.flag { color: var(--flag); background: var(--flag-bg); }
+.good { color: var(--pass); } .bad { color: var(--fail); }
+.empty { padding: 60px 20px; text-align: center; color: var(--ink-3); }
+
+aside { border-left: 1px solid var(--line); background: var(--panel); overflow: auto; }
+.detail { padding: 22px 24px 48px; }
+.detail h2 { font-size: 18px; font-weight: 650; letter-spacing: -.015em; margin: 0 0 4px; }
+.meta { color: var(--ink-3); font-size: 12.5px; display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.meta a { color: var(--accent); }
+#map { height: 210px; border-radius: var(--r); border: 1px solid var(--line); margin: 16px 0 6px; background: var(--hover); }
+section { margin-top: 22px; }
+section > h3 { font-size: 11.5px; font-weight: 650; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-3); margin: 0 0 10px; display: flex; justify-content: space-between; align-items: center; }
+.gates { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: var(--r); }
+.gates li { display: grid; grid-template-columns: 84px 1fr; gap: 10px; padding: 9px 12px; border-bottom: 1px solid var(--line); align-items: baseline; }
+.gates li:last-child { border-bottom: 0; }
+.gates .gname { font-size: 12px; color: var(--ink-3); text-transform: capitalize; }
+.gates .why { font-size: 13px; }
+.kv { display: grid; grid-template-columns: 140px 1fr; gap: 6px 12px; font-size: 13px; }
+.kv dt { color: var(--ink-3); } .kv dd { margin: 0; }
+.src { font-size: 11.5px; color: var(--ink-3); }
+.st-verified { color: var(--pass); } .st-unverified, .st-missing { color: var(--check); } .st-indicated { color: var(--flag); }
+
+.inputs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 12px; }
+.inputs label { display: flex; flex-direction: column; gap: 4px; font-size: 11.5px; color: var(--ink-3); font-weight: 500; }
+.inputs input, .inputs select { border: 1px solid var(--line-2); border-radius: 7px; padding: 6px 8px; background: var(--bg); font-variant-numeric: tabular-nums; font-size: 13px; width: 100%; }
+.inputs input:focus, .inputs select:focus, .search:focus, textarea:focus { outline: 2px solid color-mix(in srgb, var(--accent) 35%, transparent); outline-offset: 0; border-color: var(--accent); }
+.kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 14px 0 10px; }
+.kpi { border: 1px solid var(--line); border-radius: var(--r); padding: 10px 12px; }
+.kpi .l { font-size: 11px; color: var(--ink-3); text-transform: uppercase; letter-spacing: .05em; font-weight: 600; }
+.kpi .v { font-size: 19px; font-weight: 650; letter-spacing: -.02em; font-variant-numeric: tabular-nums; margin-top: 2px; }
+.kpi .s { font-size: 11.5px; color: var(--ink-3); }
+table.mini { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.mini th, .mini td { padding: 6px 8px; border-bottom: 1px solid var(--line); }
+.mini th { text-align: left; font-weight: 600; color: var(--ink-3); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+.mini tr.worst td { font-weight: 650; }
+.note { font-size: 12px; color: var(--ink-3); margin-top: 8px; }
+.warn { background: var(--check-bg); color: var(--check); padding: 9px 12px; border-radius: 8px; font-size: 12.5px; margin-top: 10px; }
+
+dialog { border: 1px solid var(--line); border-radius: 14px; padding: 0; width: min(640px, 94vw); background: var(--panel); color: var(--ink); box-shadow: 0 20px 60px rgba(0,0,0,.2); }
+dialog::backdrop { background: rgba(20,20,20,.35); }
+.dlg { padding: 22px 24px; }
+.dlg h3 { margin: 0 0 6px; font-size: 16px; }
+textarea { width: 100%; min-height: 160px; border: 1px solid var(--line-2); border-radius: 8px; padding: 10px; font-family: var(--mono); font-size: 12.5px; background: var(--bg); resize: vertical; }
+.row { display: flex; gap: 10px; align-items: center; justify-content: flex-end; margin-top: 14px; }
+.progress { font-size: 12.5px; color: var(--ink-2); margin-right: auto; }
+.assump { font-size: 12.5px; color: var(--ink-2); padding-left: 18px; margin: 0; }
+.assump li { margin-bottom: 4px; }
+.placeholder { color: var(--ink-3); padding: 80px 30px; text-align: center; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Granny-Site Finder<span>Auckland · house + 2 units screening</span></h1>
+  <div class="spacer"></div>
+  <span id="linz" class="muted" style="font-size:12px"></span>
+  <button class="btn" id="btnAssump">Assumptions</button>
+  <a class="btn" href="/api/export.csv">Export CSV</a>
+  <button class="btn primary" id="btnAdd">+ Add listings</button>
+</header>
+<main>
+  <div class="list">
+    <div class="toolbar">
+      <input class="search" id="q" placeholder="Filter by address, zone, reason…" autocomplete="off">
+      <div class="chips" id="chips"></div>
+    </div>
+    <div id="tableWrap"></div>
+  </div>
+  <aside><div id="detail" class="detail"><div class="placeholder">Select a site to see gates, map and feaso.</div></div></aside>
+</main>
+
+<dialog id="dlgAdd"><div class="dlg">
+  <h3>Add listings</h3>
+  <div class="muted" style="font-size:12.5px">One per line. Address only, or <code>address | price | bedrooms | existing dwellings | notes</code>.</div>
+  <textarea id="pasteText" placeholder="12 Sandringham Rd, Kingsland | $1,050,000 | 3 | 1&#10;45 Example Street, Mt Roskill | Enquiries over 950k | 3"></textarea>
+  <div class="row" style="justify-content:space-between">
+    <label class="btn small">Import CSV… <input type="file" id="csvFile" accept=".csv,text/csv" hidden></label>
+    <span class="progress" id="prog"></span>
+    <button class="btn" id="btnCancel">Close</button>
+    <button class="btn primary" id="btnRun">Evaluate</button>
+  </div>
+</div></dialog>
+
+<dialog id="dlgAssump"><div class="dlg">
+  <h3>Assumptions</h3>
+  <ul class="assump" id="assumpList"></ul>
+  <div class="row"><button class="btn" onclick="this.closest('dialog').close()">Close</button></div>
+</div></dialog>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const money = v => v == null ? "—" : (v < 0 ? "−$" : "$") + Math.abs(Math.round(v)).toLocaleString("en-NZ");
+const pct = v => v == null ? "—" : (v * 100).toFixed(1) + "%";
+const ratio = v => v == null ? "n/a" : v.toFixed(2) + "×";
+const ZONE_ABBR = { "Mixed Housing Suburban": "MHS", "Mixed Housing Urban": "MHU", "Terrace Housing and Apartment Building": "THAB", "Single House": "Single House", "Large Lot": "Large Lot" };
+const shortZone = z => { const s = (z || "").replace("Residential - ", "").replace(" Zone", ""); return ZONE_ABBR[s] || s; };
+const api = async (url, opt = {}) => { const r = await fetch(url, { headers: { "Content-Type": "application/json" }, ...opt });
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || r.statusText); return r.json(); };
+
+let rows = [], cfg = null, sel = null, sortKey = "rank", sortDir = 1, statusFilter = new Set(), map = null, layer = null;
+const STATUSES = ["pass", "check", "incomplete", "fail"];
+const COLS = [
+  ["rank", "#", true], ["status", "Status"], ["address", "Address"], ["price", "Price", true], ["land_m2", "Land m²", true],
+  ["zone", "Zone"], ["ltv", "LTV", true], ["stress_ltv", "Stress", true], ["io_cover", "IO", true], ["equity", "Equity", true],
+];
+
+async function load() {
+  [rows, cfg] = await Promise.all([api("/api/sites"), cfg || api("/api/config")]);
+  $("#linz").textContent = cfg.linz_enabled ? "LINZ titles: on" : "LINZ titles: off (titles unverified)";
+  renderChips(); renderTable();
+}
+
+function renderChips() {
+  const n = s => rows.filter(r => r.status === s).length;
+  $("#chips").innerHTML = STATUSES.map(s => `<button class="chip ${statusFilter.has(s) ? "on" : ""}" data-s="${s}">${s} <b>${n(s)}</b></button>`).join("");
+  $("#chips").querySelectorAll(".chip").forEach(b => b.onclick = () => {
+    statusFilter.has(b.dataset.s) ? statusFilter.delete(b.dataset.s) : statusFilter.add(b.dataset.s); renderChips(); renderTable(); });
+}
+
+function visible() {
+  const q = $("#q").value.trim().toLowerCase();
+  let out = rows.filter(r => (!statusFilter.size || statusFilter.has(r.status)) &&
+    (!q || [r.address, r.matched_address, r.zone, r.fails, r.checks, r.flags, r.title_type].join(" ").toLowerCase().includes(q)));
+  const rank = { pass: 0, check: 1, incomplete: 2, fail: 3 };
+  out.sort((a, b) => {
+    let x = a[sortKey], y = b[sortKey];
+    if (sortKey === "status") { x = rank[x] ?? 9; y = rank[y] ?? 9; }
+    if (x == null && y == null) return 0; if (x == null) return 1; if (y == null) return -1;
+    return (typeof x === "string" ? x.localeCompare(y) : x - y) * sortDir;
+  });
+  return out;
+}
+
+function renderTable() {
+  const v = visible();
+  if (!rows.length) { $("#tableWrap").innerHTML = `<div class="empty">No sites yet. Click <b>+ Add listings</b> and paste some addresses.</div>`; return; }
+  const head = COLS.map(([k, l, n]) => `<th class="${n ? "num" : ""} ${sortKey === k ? "sorted" : ""}" data-k="${k}">${l}<span class="arr">${sortKey === k ? (sortDir > 0 ? "↑" : "↓") : "↕"}</span></th>`).join("");
+  const body = v.map(r => {
+    const why = r.fails || r.checks || r.flags || "";
+    return `<tr data-id="${r.id}" class="${sel === r.id ? "sel" : ""}">
+      <td class="num muted">${r.rank}</td>
+      <td><span class="pill ${r.status}">${r.status}</span></td>
+      <td class="wrap"><div class="addr">${esc(r.matched_address || r.address)}</div><div class="sub" title="${esc(why)}">${esc(why)}</div></td>
+      <td class="num">${r.price != null ? money(r.price) : `<span class="muted">${esc(r.price_text || "—")}</span>`}</td>
+      <td class="num">${r.land_m2 != null ? Math.round(r.land_m2).toLocaleString() : "—"}</td>
+      <td title="${esc(r.zone || "")}">${esc(shortZone(r.zone) || "—")}</td>
+      <td class="num ${r.ltv == null ? "" : r.ltv <= cfg.feaso.ltv_cap ? "good" : "bad"}">${pct(r.ltv)}</td>
+      <td class="num ${r.stress_ltv == null ? "" : r.stress_ltv <= cfg.feaso.ltv_cap ? "good" : "bad"}">${pct(r.stress_ltv)}</td>
+      <td class="num ${r.io_cover == null ? "" : r.io_cover >= 1 ? "good" : "bad"}">${r.io_cover == null ? "—" : ratio(r.io_cover)}</td>
+      <td class="num">${money(r.equity)}</td></tr>`;
+  }).join("");
+  $("#tableWrap").innerHTML = `<table class="grid"><thead><tr>${head}</tr></thead><tbody>${body || `<tr><td colspan="10" class="empty">No sites match.</td></tr>`}</tbody></table>
+    <div class="note">${v.length} of ${rows.length} sites. Screening estimates only, not valuations.</div>`;
+  $("#tableWrap").querySelectorAll("th").forEach(th => th.onclick = () => {
+    sortDir = sortKey === th.dataset.k ? -sortDir : 1; sortKey = th.dataset.k; renderTable(); });
+  $("#tableWrap").querySelectorAll("tbody tr[data-id]").forEach(tr => tr.onclick = () => openSite(+tr.dataset.id));
+}
+
+const FACTS = [["matched_address", "Matched address"], ["legal_description", "Legal description"], ["title_refs", "Title refs"],
+  ["title_type", "Title type"], ["land_area_m2", "Land area m²"], ["width_m", "Min width m"], ["depth_m", "Depth m"],
+  ["road_frontage", "Road frontage"], ["zone", "Zone (operative)"], ["pc120_zone", "PC120 proposed"], ["sa2", "SA2"],
+  ["building_outlines", "Building outlines"]];
+
+function factVal(f) {
+  if (!f) return "—"; let v = f.value;
+  if (v && typeof v === "object" && !Array.isArray(v)) v = `${v.code} ${v.name}`;
+  if (v === true) v = "yes"; if (v === false) v = "no";
+  return `${esc(v ?? "—")} <span class="src st-${f.status}">· ${f.status}</span>${f.note ? `<div class="src">${esc(f.note)}</div>` : ""}`;
+}
+
+async function openSite(id) {
+  sel = id; renderTable();
+  const s = await api(`/api/sites/${id}`);
+  const L = s.listing, F = s.facts || {}, fe = s.feaso || {};
+  const hard = s.gates.filter(g => g.hard), soft = s.gates.filter(g => !g.hard);
+  const ex = fe.existing_rent || {}, un = fe.unit_rent || {};
+  const inp = (fe.report && fe.report.inputs) || cfg.feaso;
+  $("#detail").innerHTML = `
+    <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">
+      <div><h2>${esc(F.matched_address?.value || L.address)}</h2>
+      <div class="meta"><span class="pill ${s.overall}">${s.overall}</span><span>${L.price != null ? money(L.price) : esc(L.price_text || "no price")}</span>
+      <span>${L.bedrooms ?? "?"} bed</span>${L.url ? `<a href="${esc(L.url)}" target="_blank" rel="noopener">listing ↗</a>` : ""}
+      <span>evaluated ${new Date(s.evaluated_at * 1000).toLocaleString("en-NZ", { dateStyle: "medium", timeStyle: "short" })}</span></div></div>
+      <div style="display:flex;gap:6px"><button class="btn small" id="btnRefresh">Re-check</button><button class="btn small" id="btnDel">Remove</button></div>
+    </div>
+    <div id="map"></div>
+    ${F.errors?.length ? `<div class="warn">Some lookups failed, so the related gates show “check”:<br>${F.errors.map(esc).join("<br>")}</div>` : ""}
+    <section><h3>Gates</h3><ul class="gates">${hard.map(g => `<li><span><span class="pill ${g.status}">${g.status}</span></span><span><div class="gname">${esc(g.gate.replace(/_/g, " "))}</div><div class="why">${esc(g.reason)}</div></span></li>`).join("")}</ul></section>
+    ${soft.length ? `<section><h3>Soft flags</h3><ul class="gates">${soft.map(g => `<li><span><span class="pill flag">flag</span></span><span class="why">${esc(g.reason)}</span></li>`).join("")}</ul></section>` : ""}
+    <section><h3>Feaso <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:500">live: edit inputs, nothing is saved</span></h3>
+      <div class="inputs" id="fin">
+        ${field("price", "Price $", L.price ?? "", 1000)}
+        ${field("existing_rent_pw", "House rent $/wk", ex.weekly ?? "", 5)}
+        ${field("unit_rent_pw", "Unit rent $/wk", un.weekly ?? "", 5)}
+        ${field("interest_rate", "Interest %", (inp.interest_rate * 100).toFixed(2), 0.05)}
+        ${field("cap_months", "Capitalised months", inp.cap_months, 1)}
+        ${field("draw_factor", "Draw factor", inp.draw_factor, 0.05)}
+        ${field("target_yield", "Target yield %", (inp.target_yield * 100).toFixed(2), 0.05)}
+        <label>Yield basis<select data-k="yield_basis"><option ${inp.yield_basis === "gross" ? "selected" : ""}>gross</option><option ${inp.yield_basis === "net" ? "selected" : ""}>net</option></select></label>
+        ${field("opex_ratio", "Opex % (net)", (inp.opex_ratio * 100).toFixed(0), 1)}
+        ${field("unit_cost_installed", "Unit cost installed $", inp.unit_cost_installed, 5000)}
+        ${field("units", "Units", inp.units, 1)}
+        ${field("misc", "Misc per site $", inp.misc, 1000)}
+        ${field("ltv_cap", "LTV cap %", (inp.ltv_cap * 100).toFixed(0), 1)}
+      </div>
+      <div id="fout"></div>
+      <div class="note">Rents: house: ${esc(ex.label || "—")}<br>units: ${esc(un.label || "—")}</div>
+    </section>
+    <section><h3>Listing details <button class="btn small" id="btnSave">Save &amp; re-run gates</button></h3>
+      <div class="inputs">
+        ${field("e_price", "Price $", L.price ?? "", 1000)}
+        ${field("e_bedrooms", "Bedrooms", L.bedrooms ?? "", 1)}
+        ${field("e_existing_dwellings", "Existing dwellings", L.existing_dwellings ?? "", 1)}
+        ${field("e_existing_rent_override", "House rent override", L.existing_rent_override ?? "", 5)}
+        ${field("e_unit_rent_override", "Unit rent override", L.unit_rent_override ?? "", 5)}
+        ${field("e_land_area_m2", "Listing land m²", L.land_area_m2 ?? "", 1)}
+      </div>
+      <label class="inputs" style="display:block;margin-top:10px"><span class="muted" style="font-size:11.5px">Listing text (used to spot a second dwelling)</span>
+      <textarea id="e_description" style="min-height:70px;font-family:inherit">${esc(L.description || "")}</textarea></label>
+    </section>
+    <section><h3>Facts &amp; sources</h3><dl class="kv">${FACTS.map(([k, l]) => `<dt>${l}</dt><dd>${factVal(F[k])}</dd>`).join("")}</dl></section>`;
+
+  drawMap(F);
+  const recalc = debounce(() => liveFeaso(id), 180);
+  $("#fin").querySelectorAll("input,select").forEach(el => el.addEventListener("input", recalc));
+  liveFeaso(id);
+  $("#btnRefresh").onclick = async () => { $("#btnRefresh").textContent = "Checking…"; await api(`/api/sites/${id}/refresh`, { method: "POST" }); await load(); openSite(id); };
+  $("#btnDel").onclick = async () => { if (!confirm("Remove this site?")) return; await api(`/api/sites/${id}`, { method: "DELETE" }); sel = null; $("#detail").innerHTML = `<div class="placeholder">Removed.</div>`; load(); };
+  $("#btnSave").onclick = async () => {
+    const body = {}; ["price", "bedrooms", "existing_dwellings", "existing_rent_override", "unit_rent_override", "land_area_m2"].forEach(k => {
+      const v = $(`[data-k="e_${k}"]`).value.trim(); body[k] = v === "" ? null : Number(v); });
+    body.description = $("#e_description").value || null;
+    await api(`/api/sites/${id}`, { method: "PATCH", body: JSON.stringify(body) }); await load(); openSite(id);
+  };
+}
+
+function field(k, label, val, step) { return `<label>${label}<input type="number" step="${step}" data-k="${k}" value="${esc(val)}"></label>`; }
+function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
+
+async function liveFeaso(id) {
+  const body = {}; const PCT = ["interest_rate", "target_yield", "opex_ratio", "ltv_cap"];
+  $("#fin").querySelectorAll("[data-k]").forEach(el => {
+    const k = el.dataset.k, v = el.value.trim(); if (v === "") return;
+    body[k] = k === "yield_basis" ? v : PCT.includes(k) ? Number(v) / 100 : Number(v); });
+  const out = $("#fout");
+  try {
+    const r = await api(`/api/sites/${id}/feaso`, { method: "POST", body: JSON.stringify(body) });
+    if (!r.report) { out.innerHTML = `<div class="warn">Feaso incomplete: ${esc(r.note)}</div>`; return; }
+    const b = r.report.base, cap = r.report.inputs.ltv_cap, sc = r.report.scenarios;
+    const kpi = (l, v, s, cls = "") => `<div class="kpi"><div class="l">${l}</div><div class="v ${cls}">${v}</div><div class="s">${s}</div></div>`;
+    out.innerHTML = `<div class="kpis">
+      ${kpi("LTV", pct(b.ltv), `cap ${pct(cap)} · ${b.ltv_pass ? "pass" : "fail"}`, b.ltv_pass ? "good" : "bad")}
+      ${kpi("IO cover", ratio(b.io_cover), b.io_pass ? "pass (≥1.0×)" : "fail (<1.0×)", b.io_pass ? "good" : "bad")}
+      ${kpi("Equity", money(b.equity), `refi headroom ${money(b.refi_headroom)}`, b.equity >= 0 ? "" : "bad")}
+      ${kpi("Cost base", money(b.cost_base), "price + units + misc")}
+      ${kpi("Loan", money(b.loan), `incl. ${money(b.capitalised_interest)} interest`)}
+      ${kpi("End value", money(b.end_value), `NOI ${money(b.noi)}/yr`)}</div>
+      <table class="mini"><thead><tr><th>Stress case</th><th class="num">LTV</th><th class="num">IO cover</th><th class="num">Equity</th></tr></thead><tbody>
+      <tr><td>Base</td><td class="num">${pct(b.ltv)}</td><td class="num">${ratio(b.io_cover)}</td><td class="num">${money(b.equity)}</td></tr>
+      ${Object.entries(sc).map(([n, x]) => `<tr class="${n.startsWith("combined") ? "worst" : ""}"><td>${esc(n)}</td>
+        <td class="num ${x.ltv <= cap ? "good" : "bad"}">${pct(x.ltv)}</td><td class="num ${x.io_pass ? "good" : "bad"}">${ratio(x.io_cover)}</td><td class="num">${money(x.equity)}</td></tr>`).join("")}
+      </tbody></table>
+      <div class="note">Worst case: LTV ${pct(r.report.worst_ltv)}, IO cover ${ratio(r.report.worst_io_cover)}. Screening estimate, not a valuation.</div>`;
+  } catch (e) { out.innerHTML = `<div class="warn">${esc(e.message)}</div>`; }
+}
+
+function drawMap(F) {
+  if (map) { map.remove(); map = null; }
+  if (F.lat == null || typeof L === "undefined") { $("#map").innerHTML = `<div class="placeholder" style="padding:80px 0">No location</div>`; return; }
+  map = L.map("map", { zoomControl: true, attributionControl: true }).setView([F.lat, F.lon], 18);
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(map);
+  if (F.parcel_geojson) {
+    layer = L.geoJSON(F.parcel_geojson, { style: { color: "#1f5c46", weight: 2, fillOpacity: .12 } }).addTo(map);
+    map.fitBounds(layer.getBounds(), { padding: [30, 30], maxZoom: 19 });
+  }
+  L.circleMarker([F.lat, F.lon], { radius: 5, color: "#1f5c46", fillOpacity: 1 }).addTo(map);
+}
+
+// ---- add listings ----
+$("#btnAdd").onclick = () => { $("#prog").textContent = ""; $("#dlgAdd").showModal(); };
+$("#btnCancel").onclick = () => $("#dlgAdd").close();
+$("#btnAssump").onclick = () => { $("#assumpList").innerHTML = cfg.assumptions.map(a => `<li>${esc(a)}</li>`).join(""); $("#dlgAssump").showModal(); };
+$("#btnRun").onclick = async () => {
+  const text = $("#pasteText").value.trim(); if (!text) return;
+  try { follow(await api("/api/ingest/paste", { method: "POST", body: JSON.stringify({ text }) })); }
+  catch (e) { $("#prog").textContent = e.message; }
+};
+$("#csvFile").onchange = async e => {
+  const fd = new FormData(); fd.append("file", e.target.files[0]);
+  const r = await fetch("/api/ingest/csv", { method: "POST", body: fd });
+  const j = await r.json(); if (!r.ok) { $("#prog").textContent = j.detail; return; } follow(j);
+};
+async function follow(job) {
+  const tick = async () => {
+    const j = await api(`/api/jobs/${job.id}`);
+    $("#prog").textContent = `${j.done}/${j.total} evaluated${j.rejected.length ? ` · ${j.rejected.length} skipped` : ""}${j.status === "done" ? " ✓" : "…"}`;
+    if (j.done) await load();
+    if (j.status === "running") setTimeout(tick, 900); else { $("#pasteText").value = ""; }
+  }; tick();
+}
+$("#q").addEventListener("input", renderTable);
+load();
+</script>
+</body>
+</html>
