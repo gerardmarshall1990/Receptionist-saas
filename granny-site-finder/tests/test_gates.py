@@ -63,6 +63,13 @@ def test_single_house_zone_fails_with_reason():
     assert r.status == FAIL and "Single House" in r.reason
 
 
+def test_mixed_use_zone_is_check_with_consent_reason():
+    f = good_site()
+    f.zone = V("Business - Mixed Use Zone")
+    r = by_gate(evaluate(f, good_listing(), G))["zone"]
+    assert r.status == CHECK and "resource consent" in r.reason
+
+
 def test_unverified_zone_is_check_not_pass():
     f = good_site()
     f.zone = Fact(None, UNVERIFIED, "council", "split zoned: MHS / THAB")

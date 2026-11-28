@@ -44,12 +44,14 @@ def gate_address(f: SiteFacts) -> GateResult:
     return GateResult("address", CHECK, f"Address not matched: {f.matched_address.note or 'no match'}")
 
 
-def gate_zone(f: SiteFacts, allowed: list[str]) -> GateResult:
+def gate_zone(f: SiteFacts, allowed: list[str], consent: dict[str, str] | None = None) -> GateResult:
     z = f.zone
     if z.status != VERIFIED:
         return GateResult("zone", CHECK, f"Zone unverified: {z.note or 'lookup failed'}")
     if z.value in allowed:
         return GateResult("zone", PASS, f"{z.value} (operative)")
+    if consent and z.value in consent:
+        return GateResult("zone", CHECK, f"{z.value}: {consent[z.value]}")
     return GateResult("zone", FAIL, f"Zone is {z.value}, not MHS/MHU")
 
 
@@ -185,7 +187,7 @@ def soft_flags(f: SiteFacts, listing: Listing, g: dict[str, Any]) -> list[GateRe
 
 
 def evaluate(f: SiteFacts, listing: Listing, gcfg: dict[str, Any]) -> list[GateResult]:
-    results = [gate_address(f), gate_zone(f, gcfg["allowed_zones"]), gate_title(f),
+    results = [gate_address(f), gate_zone(f, gcfg["allowed_zones"], gcfg.get("consent_zones")), gate_title(f),
                gate_land(f, listing, gcfg["min_land_m2"]),
                gate_dwellings(f, listing, gcfg["required_existing_dwellings"])]
     results += gate_flood(f, gcfg["flood_layers"])

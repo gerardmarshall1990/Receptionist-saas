@@ -6,6 +6,9 @@ gates:
   allowed_zones:                       # Auckland Unitary Plan (operative) base zone names
     - "Residential - Mixed Housing Suburban Zone"
     - "Residential - Mixed Housing Urban Zone"
+  # Zones that are not rejected but need a closer look: zone -> reason shown as "check".
+  consent_zones:
+    "Business - Mixed Use Zone": "dwellings allowed, but new buildings need resource consent (restricted discretionary); confirm against AUP H13"
   min_land_m2: 600                     # MIN_LAND_M2
   max_price: 1200000                   # MAX_PRICE (NZD). Listings above this fail.
   required_existing_dwellings: 1

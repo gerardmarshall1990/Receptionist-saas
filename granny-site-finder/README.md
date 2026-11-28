@@ -90,6 +90,7 @@ so a re-run is fast.
 | Key | Default | Meaning |
 |---|---|---|
 | `gates.allowed_zones` | MHS, MHU | Operative AUP base zones that pass |
+| `gates.consent_zones` | Business – Mixed Use | Zones shown as `check` (with a reason) instead of rejected |
 | `gates.min_land_m2` | 600 | MIN_LAND_M2 |
 | `gates.max_price` | 1,200,000 | MAX_PRICE: **set your own** |
 | `gates.required_existing_dwellings` | 1 | |

@@ -288,7 +288,7 @@
   why: Business - Mixed Use zone
   hand_checked: false
   expected:
-    zone: fail
+    zone: check
     title: pass
     land_area: pass
     flood: pass
@@ -303,7 +303,7 @@
     Use zone; flood plain on edge only
   hand_checked: false
   expected:
-    zone: fail
+    zone: check
     title: pass
     land_area: pass
     flood: pass
