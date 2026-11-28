@@ -249,3 +249,19 @@ def test_parse_address(raw, num, street, suburb):
 
 def test_parse_address_rejects_garbage():
     assert parse_address("Sandringham Road") is None
+
+
+def test_gsheet_source_parses_inbox(monkeypatch):
+    from gsf.sources import gsheet
+
+    class R:
+        status_code = 200
+        text = ('"Address","Price","Bedrooms","Existing dwellings","Listing URL","Notes / listing text","Added by"\n'
+                '"14 Example Street, Suburb","950000","3","1","","Example row: delete me",""\n'
+                '"10 The Crest, Sunnyhills","1,050,000","3","1","https://x/1","Flat section","G"\n')
+    monkeypatch.setattr(gsheet.requests, "get", lambda *a, **k: R())
+    src = gsheet.GoogleSheetSource("https://docs.google.com/spreadsheets/d/1vasGaXW6TTa_BC4JyNVGBlev7WTS-6Z3z38odIkvkqo/edit")
+    ls = list(src.listings())
+    assert [l.address for l in ls] == ["10 The Crest, Sunnyhills"]
+    assert ls[0].price == 1_050_000 and ls[0].existing_dwellings == 1 and ls[0].url == "https://x/1"
+    assert "gviz/tq?tqx=out:csv&sheet=Inbox" in src.url

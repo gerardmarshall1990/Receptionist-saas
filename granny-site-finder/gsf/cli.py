@@ -5,6 +5,8 @@
   python -m gsf.cli rerun                 # re-evaluate everything stored (refetch lookups)
   python -m gsf.cli report                # write CSV + markdown shortlist to data/reports/
   python -m gsf.cli daily listings.csv    # import + report in one go (cron-friendly)
+  python -m gsf.cli sheet <sheet-url>     # import new listings from the shared sheet's Inbox tab
+  python -m gsf.cli xlsx                  # shortlist workbook for Google Sheets
   python -m gsf.cli serve                 # web UI on http://127.0.0.1:8000
 """
 from __future__ import annotations
@@ -61,6 +63,10 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("report", help="write shortlist CSV + markdown")
     s = sub.add_parser("daily", help="import CSV (optional) then write report")
     s.add_argument("path", nargs="?")
+    s = sub.add_parser("sheet", help="import listings from a Google Sheet's Inbox tab (link-shared)")
+    s.add_argument("url")
+    s = sub.add_parser("xlsx", help="write the shortlist workbook (for Google Sheets)")
+    s.add_argument("path", nargs="?", default=None)
     s = sub.add_parser("serve", help="run the web UI")
     s.add_argument("--host", default="127.0.0.1")
     s.add_argument("--port", type=int, default=8000)
@@ -78,13 +84,24 @@ def main(argv: list[str] | None = None) -> int:
         _ingest(p, PasteSource(text))
     elif a.cmd == "import":
         _ingest(p, CsvSource(path=a.path))
+    elif a.cmd == "sheet":
+        from .sources.gsheet import GoogleSheetSource
+        _ingest(p, GoogleSheetSource(a.url))
     elif a.cmd == "rerun":
         ids = p.store.all_ids()
         print(f"Re-evaluating {len(ids)} listing(s)…")
         p.run_batch([p.store.listing(i) for i in ids], _progress)
     elif a.cmd == "daily" and a.path:
         _ingest(p, CsvSource(path=a.path))
-    if a.cmd in ("report", "daily", "paste", "import", "rerun"):
+    if a.cmd == "xlsx":
+        from .report import ranked
+        from .xlsx_export import build_workbook
+        sites = [p.store.site(i) for i in p.store.all_ids()]
+        out = a.path or os.path.join(p.cfg["storage"].get("reports_dir", "data/reports"), "granny-site-shortlist.xlsx")
+        os.makedirs(os.path.dirname(out), exist_ok=True)
+        print("Workbook:", build_workbook(ranked(sites), sites, p.cfg, out))
+        return 0
+    if a.cmd in ("report", "daily", "paste", "import", "rerun", "sheet"):
         c, m = write_report(p)
         print(f"Report: {m}\nCSV:    {c}")
     return 0

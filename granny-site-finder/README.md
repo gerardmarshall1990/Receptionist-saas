@@ -33,6 +33,8 @@ pbpaste | python -m gsf.cli paste
 python -m gsf.cli import listings.csv   # CSV import (see tests/fixtures/sample_listings.csv)
 python -m gsf.cli rerun                 # re-evaluate everything (e.g. after changing config.yaml)
 python -m gsf.cli report                # write data/reports/shortlist-<stamp>.{md,csv}
+python -m gsf.cli sheet <google-sheet-url>  # pull new listings from the shared sheet's Inbox tab
+python -m gsf.cli xlsx                  # shortlist workbook (upload to Drive = Google Sheet)
 python -m gsf.cli daily listings.csv    # import + report, for cron
 GSF_LIVE=1 python -m pytest tests/test_acceptance_live.py   # 21 real addresses against live data (~2 min)
 ```
