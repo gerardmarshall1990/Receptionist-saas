@@ -72,7 +72,7 @@ rents:
   # Dwelling types tried in order (bond data categories: House, Flat, Apartment, ALL)
   existing_dwelling_types: [House, ALL]
   unit_dwelling_types: [House, Flat, ALL]
-  default_bedrooms_if_unknown: null    # null = existing rent unavailable if listing has no bedroom count
+  default_bedrooms_if_unknown: 3       # used (and labelled 'assumed') when a listing gives no bedroom count; null = no rent
 
 http:
   timeout_s: 30

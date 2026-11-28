@@ -54,6 +54,8 @@ def parse_address(raw: str) -> ParsedAddress | None:
     # Street suffix expansion, and suburb on the same comma-less segment ("12 Sandringham Rd Kingsland")
     for i, w in enumerate(words):
         key = w.lower().rstrip(".")
+        if i == 0:
+            continue            # "St George St", "Mt Albert Rd": a leading St/Mt is part of the name
         if key in STREET_TYPES or w.capitalize() in STREET_TYPES.values():
             words[i] = STREET_TYPES.get(key, w.capitalize())
             if i < len(words) - 1 and suburb is None:
@@ -66,6 +68,18 @@ def parse_address(raw: str) -> ParsedAddress | None:
     if suburb:
         suburb = re.sub(r"\s+auckland$", "", suburb, flags=re.I).strip() or None
     return ParsedAddress(num, street, suburb)
+
+
+def _variants(pa: ParsedAddress) -> list[ParsedAddress]:
+    out = []
+    streets = {pa.street, re.sub(r"^Mt\b", "Mount", pa.street), re.sub(r"^Mount\b", "Mt", pa.street),
+               re.sub(r"^St\b", "Saint", pa.street), re.sub(r"^Saint\b", "St", pa.street)}
+    nums = {pa.number, pa.number.split("-")[0]}
+    for st in streets:
+        for n in nums:
+            if (st, n) != (pa.street, pa.number):
+                out.append(ParsedAddress(n, st, pa.suburb))
+    return out
 
 
 class Council:
@@ -112,6 +126,13 @@ class Council:
             feats = self.query("property", outSR=2193, returnGeometry="true",
                                where=f"UPPER(FORMATTEDADDRESS) LIKE '{_sql(pa.number + ' ' + pa.street).upper()}%' AND SITESTATUS='Current'")
         fuzzy_note = ""
+        if not feats:
+            for alt in _variants(pa):
+                feats = self.query("property", outSR=2193, returnGeometry="true",
+                                   where=f"UPPER(STREETNAME)='{_sql(alt.street.upper())}' AND UPPER(STREETNUMBER)='{_sql(alt.number)}' AND SITESTATUS='Current'")
+                if feats:
+                    fuzzy_note = f"matched as {alt.number} {alt.street}; confirm"
+                    break
         if not feats:
             feats, fuzzy_note = self._fuzzy_street(pa)
         if pa.suburb and feats:

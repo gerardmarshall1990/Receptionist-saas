@@ -240,6 +240,8 @@ def test_geometry():
     ("Flat 2 / 45 Mt Albert Rd, Mount Albert, Auckland", "2/45", "Mt Albert Road", "Mount Albert"),
     ("7 O'Neills Ave, Takapuna", "7", "O'Neills Avenue", "Takapuna"),
     ("G09/39 Thomas Road MANGERE 2022", "G09/39", "Thomas Road", "MANGERE"),
+    ("221 St George St, Papatoetoe", "221", "St George Street", "Papatoetoe"),
+    ("208 Mt Albert Road, Mt Albert", "208", "Mt Albert Road", "Mt Albert"),
     ("31-33 Neilson Street Onehunga Auckland 1061", "31-33", "Neilson Street", "Onehunga"),
 ])
 def test_parse_address(raw, num, street, suburb):

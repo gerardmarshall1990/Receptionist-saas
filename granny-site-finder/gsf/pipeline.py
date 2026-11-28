@@ -168,7 +168,9 @@ class Pipeline:
             ex = {"weekly": listing.existing_rent_override, "label": f"manual override ${listing.existing_rent_override:,.0f}/wk", "ok": True}
         else:
             r = self._rent(f, beds, "existing")
-            ex = asdict(r) | {"label": r.label(), "ok": r.ok}
+            assumed = listing.bedrooms is None and beds is not None
+            ex = asdict(r) | {"label": ("ASSUMED %s-bed (listing gives no bedrooms): " % beds if assumed else "") + r.label(),
+                              "ok": r.ok, "bedrooms_assumed": assumed}
         if listing.unit_rent_override:
             un = {"weekly": listing.unit_rent_override, "label": f"manual override ${listing.unit_rent_override:,.0f}/wk", "ok": True}
         else:
