@@ -35,6 +35,7 @@ python -m gsf.cli rerun                 # re-evaluate everything (e.g. after cha
 python -m gsf.cli report                # write data/reports/shortlist-<stamp>.{md,csv}
 python -m gsf.cli sheet <google-sheet-url>  # pull new listings from the shared sheet's Inbox tab
 python -m gsf.cli xlsx                  # shortlist workbook (upload to Drive = Google Sheet)
+python -m gsf.cli sheet-data --sheet-url <url>  # Feaso-tab rows + per-site feasibility doc HTML
 python -m gsf.cli daily listings.csv    # import + report, for cron
 GSF_LIVE=1 python -m pytest tests/test_acceptance_live.py   # 21 real addresses against live data (~2 min)
 ```
@@ -45,6 +46,16 @@ CSV columns: `address` (required), `price`, `price_text`, `bedrooms`, `bathrooms
 `property_type`, `listing_date`, `url`, `description`, `existing_dwellings`, `listing_id`,
 `existing_rent_override`, `unit_rent_override`. Prices like "Enquiries over $900k" are parsed and
 flagged as indicative; "Auction"/"Tender" give no price, so the site shows **incomplete**.
+
+## Shared Google Sheet
+
+- **Feaso** tab: every non-failed site. Yellow cells are inputs (price, bedrooms, rents, units). Profit,
+  LTV, IO cover, cash left in and combined stress are live formulas that mirror `gsf/feaso.py`
+  (checked by `tests/test_sheet_feaso.py` and against hand case 1 in the live sheet). Sort by Profit.
+- **Settings** tab: rate, capitalised months, draw, yield, basis, LTV cap, unit cost, misc, stress. Change
+  one and every row recalculates.
+- **Feasibility doc** link per site: Google Doc with the feaso, stress cases, rent evidence, gates and title.
+- **Shortlist / Gates / Assumptions / Inbox** tabs as before.
 
 ## How it works
 

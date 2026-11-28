@@ -91,7 +91,9 @@ def assumptions(cfg: dict) -> list[str]:
         f"Rents: Tenancy Services bond data by SA2 2018, {r['existing_rent_stat']} for listing bedrooms "
         f"({'/'.join(r['existing_dwelling_types'])}); units {r['unit_rent_stat']} {r['unit_bedrooms']}-bed "
         f"({'/'.join(r['unit_dwelling_types'])}); min {r['min_bonds']} bonds, else last {r.get('pool_quarters', 4)} quarters pooled, then SA2s within {r.get('neighbour_radius_m', 0)} m.",
-        f"Gates: zone in {', '.join(z.replace('Residential - ', '') for z in g['allowed_zones'])} (operative AUP); "
+        f"Gates: zone in {', '.join(z.replace('Residential - ', '') for z in g['allowed_zones'])} (operative AUP)"
+        + (f", or 'check' (consent needed) for {', '.join(z.replace('Residential - ', '') for z in g.get('consent_zones', {}))}; " if g.get('consent_zones') else "; ")
+        + f"
         f"freehold title; land ≥ {g['min_land_m2']} m²; 1 existing dwelling; price ≤ ${g['max_price']:,.0f}; "
         f"no flood/OLFP on the central {g['building_core_scale']:.0%}-scaled 'likely building area'.",
         "Title type is only 'verified' from LINZ titles. Council legal descriptions can show cross-lease/unit "

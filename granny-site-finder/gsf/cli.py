@@ -65,6 +65,9 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("path", nargs="?")
     s = sub.add_parser("sheet", help="import listings from a Google Sheet's Inbox tab (link-shared)")
     s.add_argument("url")
+    s = sub.add_parser("sheet-data", help="write Feaso-tab rows (JSON) + feasibility doc HTML for qualifying sites")
+    s.add_argument("--sheet-url", default="")
+    s.add_argument("--first-row", type=int, default=2)
     s = sub.add_parser("xlsx", help="write the shortlist workbook (for Google Sheets)")
     s.add_argument("path", nargs="?", default=None)
     s = sub.add_parser("serve", help="run the web UI")
@@ -93,6 +96,21 @@ def main(argv: list[str] | None = None) -> int:
         p.run_batch([p.store.listing(i) for i in ids], _progress)
     elif a.cmd == "daily" and a.path:
         _ingest(p, CsvSource(path=a.path))
+    if a.cmd == "sheet-data":
+        import json as _json
+        from .sheet_feaso import FEASO_HEADERS, doc_html, feaso_rows, qualifying, settings_rows
+        sites = [p.store.site(i) for i in p.store.all_ids()]
+        d = os.path.join(p.cfg["storage"].get("reports_dir", "data/reports"), "sheet")
+        os.makedirs(d, exist_ok=True)
+        q = qualifying(sites)
+        for n, s_ in enumerate(q):
+            with open(os.path.join(d, f"doc-{s_['id']}.html"), "w") as fh:
+                fh.write(doc_html(s_, p.cfg, a.sheet_url, a.first_row + n))
+        with open(os.path.join(d, "feaso.json"), "w") as fh:
+            _json.dump({"settings": settings_rows(p.cfg), "headers": FEASO_HEADERS,
+                        "rows": feaso_rows(sites, first_row=a.first_row), "site_ids": [x["id"] for x in q]}, fh)
+        print(f"{len(q)} qualifying sites -> {d}/feaso.json and doc-<id>.html")
+        return 0
     if a.cmd == "xlsx":
         from .report import ranked
         from .xlsx_export import build_workbook

@@ -9,6 +9,7 @@ gates:
   # Zones that are not rejected but need a closer look: zone -> reason shown as "check".
   consent_zones:
     "Business - Mixed Use Zone": "dwellings allowed, but new buildings need resource consent (restricted discretionary); confirm against AUP H13"
+    "Residential - Terrace Housing and Apartment Building Zone": "higher-density residential; confirm dwelling numbers and building standards against AUP H6"
   min_land_m2: 600                     # MIN_LAND_M2
   max_price: 1200000                   # MAX_PRICE (NZD). Listings above this fail.
   required_existing_dwellings: 1
