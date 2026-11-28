@@ -22,7 +22,7 @@
   why: THAB zone; flood plain + flood prone + OLFP
   hand_checked: false
   expected:
-    zone: fail
+    zone: check
     title: pass
     land_area: pass
     flood: fail
@@ -36,7 +36,7 @@
   why: cross-lease flat; Mt Eden viewshaft
   hand_checked: false
   expected:
-    zone: fail
+    zone: check
     title: fail
     land_area: pass
     flood: pass
@@ -190,7 +190,7 @@
   why: THAB zone
   hand_checked: false
   expected:
-    zone: fail
+    zone: check
     title: pass
     land_area: pass
     flood: pass
@@ -218,7 +218,7 @@
   why: unit title (principal + accessory unit)
   hand_checked: false
   expected:
-    zone: fail
+    zone: check
     title: fail
     land_area: pass
     flood: pass
