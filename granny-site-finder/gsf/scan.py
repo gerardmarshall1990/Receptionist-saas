@@ -204,7 +204,8 @@ def main(argv=None) -> int:
     t5 = []
     for pc in t4:
         parcel = esri_poly(pc["rings"])
-        core = esri_poly(geo.scaled(pc["rings"], g["building_core_scale"]))
+        core_r = geo.scaled(pc["rings"], g["building_core_scale"])
+        core = esri_poly(core_r)
         if parcel is None or core is None:
             continue
         fail, partial = [], []
@@ -216,7 +217,7 @@ def main(argv=None) -> int:
         if fail:
             continue
         pc["flags"] = [f"{k} touches parcel edge" for k in partial]
-        pc["core_rings"] = [list(core.exterior.coords)]
+        pc["core_rings"] = core_r
         t5.append(pc)
     log(f"  {len(t5):,} clear of flood plain/flood-prone/heritage/SEA/mana whenua on the building area")
 
