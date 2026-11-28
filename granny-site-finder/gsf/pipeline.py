@@ -76,6 +76,17 @@ class Pipeline:
         f.multi_parcel = Fact(len(titles) > 1 or lot_count(a.get("PROPERTYDESCRIPTION")) > 1, VERIFIED, "council legal description")
         f.parcel_geojson = None
 
+        wgs_rings: list = []
+
+        def wgs():
+            w = self.council.wgs84_geometry(a["OBJECTID"])
+            if w:
+                wgs_rings.extend(w)
+                cx, cy = geo.centroid(geo.outer_ring(w))
+                f.lon, f.lat = round(cx, 6), round(cy, 6)
+                f.parcel_geojson = geo.to_geojson(w)
+        self._step(f, "map location", wgs, lambda m: None)
+
         # Title type: LINZ is authoritative; council description can only indicate non-freehold.
         council_title = title_fact_from_council_records(a.get("PROPERTYDESCRIPTION"), feat.get("children"))
         if council_title.status == INDICATED:
@@ -84,13 +95,15 @@ class Pipeline:
                 f.land_area_m2.note = "area is the whole underlying lot, shared with other owners"
         else:
             f.title_type = council_title
-        if self.linz.enabled:
-            lt = self._step(f, "LINZ titles", lambda: self.linz.titles(rings), lambda m: None)
+        if self.linz.enabled and wgs_rings:
+            tx, ty = geo.interior_point(wgs_rings)
+            lt = self._step(f, "LINZ titles", lambda: self.linz.titles(tx, ty), lambda m: None)
             if lt is not None and lt.status == VERIFIED:
                 f.title_type = lt
             elif lt is not None and f.title_type.status != INDICATED:
+                lt.note = f"{lt.note}; council: {f.title_type.note}" if f.title_type.note else lt.note
                 f.title_type = lt
-            b = self._step(f, "LINZ buildings", lambda: self.linz.buildings(rings), lambda m: None)
+            b = self._step(f, "LINZ buildings", lambda: self.linz.buildings(wgs_rings), lambda m: None)
             if b is not None:
                 f.building_outlines = b
         else:
@@ -130,13 +143,6 @@ class Pipeline:
             if nb:
                 f.sa2.value["neighbours"] = nb
 
-        def wgs():
-            w = self.council.wgs84_geometry(a["OBJECTID"])
-            if w:
-                cx, cy = geo.centroid(geo.outer_ring(w))
-                f.lon, f.lat = round(cx, 6), round(cy, 6)
-                f.parcel_geojson = geo.to_geojson(w)
-        self._step(f, "map location", wgs, lambda m: None)
         return f
 
     # ---------------------------------------------------------------- rents --

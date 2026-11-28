@@ -5,11 +5,12 @@ LINZ WFS requires an API key (HTTP 401 without one). Layer ids and field names w
   50772 NZ Primary Parcels  (id, appellation, titles, survey_area, calc_area, shape)
   50804 NZ Property Titles  (title_no, status, type, estate_description, shape)
   101290 NZ Building Outlines (building_id, use, shape)
-The WFS GetFeature calls below follow the documented Koordinates WFS 2.0 interface but have NOT
-been run live (no key was available). Without LINZ_API_KEY, title type stays 'unverified'.
+Queried through the LDS vector query API (point/radius). Without LINZ_API_KEY, title type stays
+'unverified'.
 """
 from __future__ import annotations
 
+import math
 import os
 
 from .. import geometry as geo
@@ -19,9 +20,14 @@ from .http import HttpClient, LookupFailed
 
 
 class Linz:
+    """LINZ Data Service via the vector query API (verified live 2026-11-28 with a key).
+    GET /services/query/v1/vector.json?layer=<id>&x=<lon>&y=<lat>&radius=<m>
+    Auth: "Authorization: key <KEY>". (The WFS endpoint does not accept header auth.)"""
+
+    QUERY = "https://data.linz.govt.nz/services/query/v1/vector.json"
+
     def __init__(self, http: HttpClient, cfg: dict):
         self.http = http
-        self.base = cfg["sources"]["linz_wfs"]
         self.layers = cfg["sources"]["linz_layers"]
         self.cache_days = cfg["http"]["cache_days"]["linz"]
         self.key = os.environ.get("LINZ_API_KEY", "").strip()
@@ -30,21 +36,41 @@ class Linz:
     def enabled(self) -> bool:
         return bool(self.key)
 
-    def _features(self, layer_id: int, rings: list) -> list[dict]:
-        xs = [p[0] for r in rings for p in r]
-        ys = [p[1] for r in rings for p in r]
-        # Koordinates accepts the key as "Authorization: key <KEY>"; bbox axis order for EPSG:2193 in WFS 2.0 is N,E.
-        url = self.base
-        params = {
-            "service": "WFS", "version": "2.0.0", "request": "GetFeature",
-            "typeNames": f"layer-{layer_id}", "outputFormat": "json", "srsName": "EPSG:2193",
-            "bbox": f"{min(ys)},{min(xs)},{max(ys)},{max(xs)},urn:ogc:def:crs:EPSG::2193",
-            "count": 200,
-        }
-        data = self.http.request_json("GET", url, params, cache_days=self.cache_days,
-                                      headers={"Authorization": f"key {self.key}"},
-                                      cache_url_label=f"linz-wfs-layer-{layer_id}")
-        return data.get("features", [])
+    def _query(self, layer_id: int, lon: float, lat: float, radius_m: float = 0, geometry: bool = False) -> list[dict]:
+        params = {"layer": layer_id, "x": round(lon, 7), "y": round(lat, 7), "radius": int(math.ceil(radius_m)),
+                  "max_results": 100, "geometry": "true" if geometry else "false", "with_field_names": "true"}
+        data = self.http.request_json("GET", self.QUERY, params, cache_days=self.cache_days,
+                                      headers={"Authorization": f"key {self.key}"})
+        layer = ((data.get("vectorQuery") or {}).get("layers") or {}).get(str(layer_id)) or {}
+        if "error" in layer:
+            raise LookupFailed(f"LINZ layer {layer_id}: {layer['error']}")
+        return layer.get("features", [])
+
+    def titles(self, lon: float, lat: float) -> Fact:
+        if not self.enabled:
+            return Fact(None, UNVERIFIED, "LINZ NZ Property Titles", "LINZ_API_KEY not set; title type not checked")
+        rows = [f["properties"] for f in self._query(self.layers["titles"], lon, lat)
+                if (f["properties"].get("status") or "LIVE").upper() == "LIVE"]
+        return title_fact_from_linz(rows)
+
+    def buildings(self, wgs_rings: list, min_area_m2: float = 30) -> Fact:
+        if not self.enabled:
+            return Fact(None, UNVERIFIED, "LINZ NZ Building Outlines", "LINZ_API_KEY not set")
+        import math
+        ring = geo.outer_ring(wgs_rings)
+        lon0, lat0 = geo.centroid(ring)
+        kx, ky = 111320 * math.cos(math.radians(lat0)), 110574       # metres per degree
+        to_m = lambda r: [[(x - lon0) * kx, (y - lat0) * ky] for x, y in r]  # noqa: E731
+        parcel_m = [to_m(r) for r in wgs_rings]
+        radius = max(math.hypot(x, y) for x, y in parcel_m[0]) + 5
+        n = 0
+        for f in self._query(self.layers["buildings"], lon0, lat0, radius, geometry=True):
+            for poly in self._polys(f.get("geometry")):
+                pm = [to_m(r) for r in poly]
+                cx, cy = geo.centroid(pm[0])
+                if geo.point_in_polygon(cx, cy, parcel_m) and abs(geo.ring_signed_area(pm[0])) >= min_area_m2:
+                    n += 1
+        return Fact(n, VERIFIED, "LINZ NZ Building Outlines", f"buildings >= {min_area_m2} m² with centroid on parcel")
 
     @staticmethod
     def _polys(geom: dict) -> list[list]:
@@ -55,38 +81,6 @@ class Linz:
         if geom["type"] == "MultiPolygon":
             return geom["coordinates"]
         return []
-
-    @staticmethod
-    def _xy(rings: list) -> list:
-        # GeoJSON from WFS in EPSG:2193 may be (N, E); normalise to (E, N) by magnitude check.
-        def fix(p):
-            x, y = p[0], p[1]
-            return [y, x] if x > 4_000_000 else [x, y]
-        return [[fix(p) for p in r] for r in rings]
-
-    def titles(self, rings: list) -> Fact:
-        if not self.enabled:
-            return Fact(None, UNVERIFIED, "LINZ NZ Property Titles", "LINZ_API_KEY not set; title type not checked")
-        px, py = geo.interior_point(rings)
-        rows = []
-        for f in self._features(self.layers["titles"], rings):
-            if any(geo.point_in_polygon(px, py, self._xy(poly)) for poly in self._polys(f.get("geometry"))):
-                p = f.get("properties", {})
-                if (p.get("status") or "").upper() in ("LIVE", ""):
-                    rows.append(p)
-        return title_fact_from_linz(rows)
-
-    def buildings(self, rings: list, min_area_m2: float = 30) -> Fact:
-        if not self.enabled:
-            return Fact(None, UNVERIFIED, "LINZ NZ Building Outlines", "LINZ_API_KEY not set")
-        n = 0
-        for f in self._features(self.layers["buildings"], rings):
-            for poly in self._polys(f.get("geometry")):
-                poly = self._xy(poly)
-                cx, cy = geo.centroid(poly[0])
-                if geo.point_in_polygon(cx, cy, rings) and geo.polygon_area(poly) >= min_area_m2:
-                    n += 1
-        return Fact(n, VERIFIED, "LINZ NZ Building Outlines", f"buildings >= {min_area_m2} m² with centroid on parcel")
 
 
 class Sa2:

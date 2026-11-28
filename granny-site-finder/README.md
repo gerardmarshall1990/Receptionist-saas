@@ -51,7 +51,7 @@ ListingSource (paste | CSV | Trade Me API stub)
   -> council property lookup (address -> boundary, legal description, title refs)
   -> area/shape computed in NZTM; "likely building area" = parcel scaled 60% about an interior point
   -> zone (operative AUP), flood layers, overlays, road frontage, RUB, PC120   [Auckland Council ArcGIS]
-  -> title type + building outlines                                           [LINZ WFS, if key set]
+  -> title type + building outlines                                           [LINZ, if key set]   
   -> SA2 -> rents (Tenancy Services bond data)                                [Stats NZ + Tenancy Services]
   -> gates (pass / fail / check / incomplete + soft flags, each with a one-line reason)
   -> feaso (base + 4 single stresses + combined worst case)
@@ -76,7 +76,7 @@ Code map: `gsf/feaso.py` (maths), `gsf/gates.py`, `gsf/titles.py`, `gsf/pipeline
 | Other | `Rural_Urban_Boundary`, `PC120Revised_PROD_PropertySummary` (proposed zones) | Verified |
 | SA2 | Stats NZ `Census2018_dwellings_counts_by_SA2` (bond Location Ids match SA2 2018: 1623/1627) | Verified |
 | Rents | Tenancy Services detailed quarterly bond CSV (SA2 × dwelling type × beds, LQ/median/UQ) | Verified; auto-refreshed monthly |
-| Title type, building outlines | LINZ LDS WFS layers 50804 (Titles), 50772 (Primary Parcels), 101290 (Building Outlines) | Layer ids and fields verified via metadata API; **WFS queries not live-tested (needs key)** |
+| Title type, building outlines | LINZ LDS vector query API, layers 50804 (Titles) and 101290 (Building Outlines); key sent as `Authorization: key …` | Verified live on 22 addresses (needs `LINZ_API_KEY`) |
 | Market Rent API | api.business.govt.nz | **Not implemented**: needs a subscription key; schema unverified |
 | Trade Me | Property API | **Stub only.** Never scrapes trademe.co.nz |
 
@@ -112,10 +112,9 @@ or CSV.
 
 ## Known limitations
 
-- **No LINZ key = no verified title.** Freehold-looking sites stay `check`. Cross-leases and unit
-  titles are still caught from the council legal description ("Flat 1 DP…", "Unit B UP…", "PRIN/AU…
-  DP", or a parent lot with child flat records). The LINZ WFS code follows the documented interface
-  but has not been run live.
+- **Set `LINZ_API_KEY`.** Without it, freehold-looking sites stay `check`. The council legal
+  description misses many cross-leases: 17 Coates Rd and 22 Portadown Ave show a plain "LOT n DP…" but
+  LINZ says cross-lease. The key needs the "Full access to tables and layers' data" scope.
 - **Existing dwelling count** comes from listing text or your entry only. Absence of keywords is
   `check`, not `pass`. LINZ building outlines (with a key) add a flag when there are more than 1
   building over 30 m².
