@@ -89,12 +89,13 @@
   observed_title_source: LINZ
   observed_buildings: 1
 - address: 7B Kallu Crescent, Mount Roskill
-  why: MHU, share in access lot (JOAL)
+  why: MHU; council boundary 1,079 m2 includes 1/13 share of access lot; owned lot
+    is 237 m2 (LINZ)
   hand_checked: false
   expected:
     zone: pass
     title: pass
-    land_area: pass
+    land_area: fail
     flood: pass
     overlays: pass
   observed_zone: Residential - Mixed Housing Urban Zone

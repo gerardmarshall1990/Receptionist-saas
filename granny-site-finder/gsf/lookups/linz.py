@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import math
 import os
+import re
 
 from .. import geometry as geo
 from ..models import UNVERIFIED, VERIFIED, Fact
@@ -72,6 +73,42 @@ class Linz:
                     n += 1
         return Fact(n, VERIFIED, "LINZ NZ Building Outlines", f"buildings >= {min_area_m2} m² with centroid on parcel")
 
+    def lot_area(self, lon: float, lat: float, description: str | None, title_refs: str | None,
+                 council_area: float) -> Fact | None:
+        """Area of the lots the owner actually holds, from LINZ Primary Parcels. Needed when the council
+        boundary also includes shares in common/access lots ("1/34 SH LOT 3018 DP ..."). Returns None when
+        not applicable or no key."""
+        if not self.enabled or not description:
+            return None
+        own = own_lots(description)
+        if not own or not re.search(r"\bSH(ARE)?\b", description, re.I):
+            return None
+        refs = {t.strip().upper() for t in (title_refs or "").split(",") if t.strip()}
+        radius = min(1000, int(math.sqrt(max(council_area, 100)) * 1.5 + 60))
+        params = {"layer": self.layers["parcels"], "x": round(lon, 7), "y": round(lat, 7), "radius": radius,
+                  "max_results": 100, "geometry": "false", "with_field_names": "true"}
+        data = self.http.request_json("GET", self.QUERY, params, cache_days=self.cache_days,
+                                      headers={"Authorization": f"key {self.key}"})
+        feats = (((data.get("vectorQuery") or {}).get("layers") or {}).get(str(self.layers["parcels"])) or {}).get("features", [])
+        total, found = 0.0, set()
+        for f in feats:
+            pr = f["properties"]
+            app = norm_appellation(pr.get("appellation"))
+            if app not in own:
+                continue
+            ptitles = {t.strip().upper() for t in (pr.get("titles") or "").split(",") if t.strip()}
+            if refs and ptitles and not (refs & ptitles):
+                continue
+            if app in found and not refs:
+                continue
+            found.add(app)
+            total += float(pr.get("survey_area") or pr.get("calc_area") or 0)
+        if found != own:
+            return Fact(None, UNVERIFIED, "LINZ Primary Parcels",
+                        f"could not find all owned lots ({', '.join(sorted(own - found))}); council area includes shared lots")
+        return Fact(round(total, 1), VERIFIED, "LINZ Primary Parcels (owned lots only, excluding shared lots)",
+                    f"{' + '.join(sorted(own))}")
+
     @staticmethod
     def _polys(geom: dict) -> list[list]:
         if not geom:
@@ -81,6 +118,24 @@ class Linz:
         if geom["type"] == "MultiPolygon":
             return geom["coordinates"]
         return []
+
+
+_LOT = re.compile(r"\b(?:(PT|PART)\s+)?(LOT|SEC(?:TION)?|ALLOT(?:MENT)?)\s+(\w+)\s+(DP|SO|LT)\s*(\d+)", re.I)
+_SHARE_LOT = re.compile(r"\b\d+\s*/\s*\d+\s*(?:SH|SHARE)\s+(?:IN\s+)?(?:(?:PT|PART)\s+)?(?:LOT|SEC(?:TION)?|ALLOT(?:MENT)?|AU|AREA)\s+\w+\s+(?:DP|SO|LT|UP)\s*\d+", re.I)
+
+
+def norm_appellation(a: str | None) -> str:
+    m = _LOT.search(a or "")
+    if not m:
+        return ""
+    kind = {"SEC": "SEC", "SECTION": "SEC", "ALLOT": "ALLOT", "ALLOTMENT": "ALLOT"}.get(m.group(2).upper(), "LOT")
+    return f"{'PT ' if m.group(1) else ''}{kind} {m.group(3).upper()} {m.group(4).upper()} {m.group(5)}"
+
+
+def own_lots(description: str) -> set[str]:
+    """Lots held outright (shares in other lots removed)."""
+    d = _SHARE_LOT.sub(" ", description or "")
+    return {norm_appellation(m.group(0)) for m in _LOT.finditer(d)}
 
 
 class Sa2:

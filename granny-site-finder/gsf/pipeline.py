@@ -103,6 +103,15 @@ class Pipeline:
             elif lt is not None and f.title_type.status != INDICATED:
                 lt.note = f"{lt.note}; council: {f.title_type.note}" if f.title_type.note else lt.note
                 f.title_type = lt
+            if f.lat is not None:
+                la = self._step(f, "LINZ lot area", lambda: self.linz.lot_area(
+                    f.lon, f.lat, a.get("PROPERTYDESCRIPTION"), a.get("FORMATTEDTITLES"), shape["area"]), lambda m: None)
+                if la is not None:
+                    if la.status == VERIFIED:
+                        la.note = f"{la.note}; council boundary incl. shared lots was {shape['area']:,.0f} m²"
+                        f.land_area_m2 = la
+                    else:
+                        f.land_area_m2 = Fact(f.land_area_m2.value, UNVERIFIED, f.land_area_m2.source, la.note)
             b = self._step(f, "LINZ buildings", lambda: self.linz.buildings(wgs_rings), lambda m: None)
             if b is not None:
                 f.building_outlines = b
